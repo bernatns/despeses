@@ -1112,7 +1112,18 @@ async function addExpense(rec) {
 
 async function deleteExpense(id, silent) {
   if (!silent && !confirm('Eliminar aquesta despesa?')) return;
-  await sb.from('expenses').delete().eq('id', id).eq('user_id', currentUser.id);
+  console.log('Deleting expense id:', id, 'type:', typeof id);
+  const { data, error, count } = await sb.from('expenses')
+    .delete()
+    .eq('id', id)
+    .eq('user_id', currentUser.id)
+    .select();
+  console.log('Delete result:', { data, error, count });
+  if (error) { showToast('Error esborrant: ' + error.message, 'error'); return; }
+  if (!data || data.length === 0) {
+    showToast('No s\'ha trobat la despesa a la base de dades (id: ' + id + ')', 'error');
+    return;
+  }
   for (const yr of Object.keys(expenses))
     for (const mo of Object.keys(expenses[yr]))
       expenses[yr][mo] = expenses[yr][mo].filter(e => e.id !== id);
