@@ -365,7 +365,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v1.6</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v1.7</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -1131,7 +1131,7 @@ async function deleteExpense(id, silent) {
   for (const yr of Object.keys(expenses))
     for (const mo of Object.keys(expenses[yr]))
       expenses[yr][mo] = expenses[yr][mo].filter(e => e.id !== numId && e.id !== id);
-  if (!silent) { renderCards(); renderTable(); showToast('Despesa eliminada'); }
+  if (!silent) { renderCards(); renderTable(); showToast('Despesa eliminada (' + data.length + ' fila/es a Supabase)'); }
 }
 
 async function putCat(cat) {
