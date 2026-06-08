@@ -2342,6 +2342,11 @@ document.querySelectorAll('.modal-bg').forEach(bg=>{
 let _fmtSampleLines = [];  // {text, type}[] for configurator
 let _editingFmtId   = null;
 
+const BUILTIN_FORMATS = [
+  {"id":"kutxa_compte",  "name":"Kutxabank compte",  "builtin":true, "blockSize":4, "lines":["date","name","amount","skip"]},
+  {"id":"kutxa_targeta", "name":"Kutxabank targeta", "builtin":true, "blockSize":4, "lines":["date","name","amount","skip"]}
+];
+
 function getBankFormats() { return [...BUILTIN_FORMATS, ...(lsGet(LS_FORMATS) || [])]; }
 function saveBankFormats(f) { lsSet(LS_FORMATS, f.filter(x => !x.builtin)); }
 
@@ -2984,17 +2989,13 @@ async function deleteMerchant(name) {
 function showApp() {
   document.getElementById('loginScreen').classList.remove('visible');
   document.getElementById('diag').style.display = 'none';
+  // Remove all inline display styles — let CSS .visible handle it
   document.querySelectorAll('header, .app').forEach(el => el.style.removeProperty('display'));
-  // Show only the active tab
-  document.querySelectorAll('.app').forEach(el => {
-    if (!el.classList.contains('visible')) el.style.display = 'none';
-  });
-  document.querySelector('.app.visible').style.display = 'block';
 }
 
 function showLogin() {
   document.getElementById('loginScreen').classList.add('visible');
-  document.querySelectorAll('header, .app#tab-mes, .app#tab-anual, .app#tab-grafics, .app#tab-categories, .app#tab-merchants, .app#tab-analisi').forEach(el => el.style.display = 'none');
+  document.querySelectorAll('header').forEach(el => el.style.display = 'none');
 }
 
 async function onAuthChange(session) {
