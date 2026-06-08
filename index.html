@@ -1021,9 +1021,13 @@ async function loadAll() {
   if (!currentUser) return;
   const uid = currentUser.id;
 
+  // Test connection first
+  const { data: testData, error: testErr } = await sb.from('categories').select('count').limit(1);
+  if (testErr) throw new Error('Connexió fallida: ' + testErr.message + ' (codi: ' + testErr.code + ')');
+
   // Categories
   const { data: cats, error: catsErr } = await sb.from('categories').select('*').eq('user_id', uid);
-  if (catsErr) throw new Error('categories: ' + catsErr.message);
+  if (catsErr) throw new Error('categories: ' + catsErr.message + ' (codi: ' + catsErr.code + ')');
   if (cats && cats.length) {
     categories = cats.map(r => ({ id: r.cat_id, name: r.name, type: r.type }));
   } else {
@@ -3019,4 +3023,3 @@ init();
 </script>
 </body>
 </html>
-
