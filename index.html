@@ -1,0 +1,3025 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Despeses">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" id="pwa-manifest">
+<title>Despeses Personals</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  /* LOGIN */
+  #loginScreen {
+    display:none; position:fixed; inset:0; background:var(--bg);
+    z-index:1000; align-items:center; justify-content:center;
+  }
+  #loginScreen.visible { display:flex; }
+  .login-card {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:16px; padding:36px 32px; width:360px; max-width:92vw;
+  }
+  .login-logo { font-family:'DM Mono',monospace; font-size:22px; color:var(--accent); font-weight:500; margin-bottom:6px; }
+  .login-sub { font-size:13px; color:var(--muted); margin-bottom:28px; }
+  .login-tabs { display:flex; gap:4px; margin-bottom:20px; background:var(--surface2); border-radius:8px; padding:3px; }
+  .login-tab { flex:1; text-align:center; padding:7px; border-radius:6px; font-size:13px; cursor:pointer; border:none; background:none; font-family:'DM Sans',sans-serif; color:var(--muted); transition:all .15s; }
+  .login-tab.active { background:var(--surface); color:var(--text); font-weight:600; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+  .login-error { font-size:12px; color:var(--danger); min-height:18px; margin-bottom:8px; }
+  .login-spinner { display:inline-block; width:16px; height:16px; border:2px solid rgba(255,255,255,0.4); border-top-color:white; border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; margin-right:6px; }
+
+  :root {
+    --bg: #f4f5f7;
+    --surface: #ffffff;
+    --surface2: #f0f1f3;
+    --border: #e0e2e7;
+    --accent: #2563eb;
+    --accent2: #0891b2;
+    --danger: #dc2626;
+    --text: #111827;
+    --muted: #6b7280;
+    --income: #16a34a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+  /* HEADER */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header-top {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 16px;
+    height: 50px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-nav {
+    display: flex;
+    align-items: center;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 2px;
+    padding: 6px 12px;
+  }
+  .header-nav::-webkit-scrollbar { display: none; }
+  .logo { font-family: 'DM Mono', monospace; font-size: 15px; color: var(--accent); font-weight: 500; letter-spacing: -0.5px; white-space: nowrap; }
+  nav { display: contents; }
+  nav button {
+    background: none; border: none; color: var(--muted); cursor: pointer;
+    padding: 6px 14px; border-radius: 6px; font-size: 13px; font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s; white-space: nowrap; flex-shrink: 0;
+  }
+  nav button:hover { color: var(--text); background: var(--surface2); }
+  nav button.active { color: var(--accent); background: rgba(37,99,235,0.08); font-weight: 600; }
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .year-select {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 8px; border-radius: 6px; font-size: 13px; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+  }
+
+  /* LAYOUT */
+  .app { display: none; padding: 24px; max-width: 1400px; margin: 0 auto; }
+  .app.visible { display: block; }
+
+  /* CARDS ROW */
+  .cards { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; margin-bottom: 24px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 20px; position: relative; overflow: hidden;
+  }
+  .card::before {
+    content:''; position:absolute; top:0; left:0; right:0; height:2px;
+  }
+  .card.income::before { background: var(--income); }
+  .card.expense::before { background: var(--danger); }
+  .card.saving::before { background: var(--accent); }
+  .card.fixed::before { background: var(--accent2); }
+  .card-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+  .card-value { font-family: 'DM Mono', monospace; font-size: 26px; font-weight: 500; }
+  .card.income .card-value { color: var(--income); }
+  .card.expense .card-value { color: var(--danger); }
+  .card.saving .card-value { color: var(--accent); }
+  .card.fixed .card-value { color: var(--accent2); }
+  .card-sub { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+  /* ANNUAL SUMMARY */
+  .annual-kpis { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:16px; }
+  .annual-kpi { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .annual-kpi-label { font-size:11px; text-transform:uppercase; letter-spacing:.8px; color:var(--muted); margin-bottom:6px; }
+  .annual-kpi-value { font-family:'DM Mono',monospace; font-size:22px; font-weight:600; }
+  .annual-kpi-sub { font-size:11px; color:var(--muted); margin-top:3px; }
+  .annual-cat-bars { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:16px; }
+  .annual-cat-bars-title { font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin-bottom:12px; }
+  @media(max-width:600px) { .annual-kpis { grid-template-columns:1fr 1fr; } }
+
+  /* TABLE SECTION */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .section-title { font-size: 15px; font-weight: 600; }
+  .btn {
+    background: var(--accent); color: #ffffff; border: none; cursor: pointer;
+    padding: 7px 16px; border-radius: 7px; font-size: 13px; font-weight: 600;
+    font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  }
+  .btn:hover { background: #1d4ed8; }
+  .btn.ghost {
+    background: transparent; color: var(--text); border: 1px solid var(--border);
+  }
+  .btn.ghost:hover { background: var(--surface2); }
+  .btn.danger { background: var(--danger); color: white; }
+  .btn.sm { padding: 4px 10px; font-size: 12px; }
+
+  /* MONTH GRID */
+  .month-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 20px; }
+  .month-tab {
+    background: var(--surface); border: 1px solid var(--border); color: var(--muted);
+    padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+    font-family: 'DM Mono', monospace; transition: all 0.15s;
+  }
+  .month-tab:hover { border-color: var(--accent); color: var(--accent); }
+  .month-tab.active { border-color: var(--accent); color: var(--accent); background: rgba(37,99,235,0.06); }
+
+  /* EXPENSES TABLE */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    background: var(--surface2); text-align: left; padding: 11px 16px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+  td { padding: 10px 16px; border-top: 1px solid var(--border); vertical-align: middle; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .cat-badge {
+    display: inline-block; padding: 3px 9px; border-radius: 4px; font-size: 11px;
+    font-weight: 500; background: var(--surface2); color: var(--muted);
+  }
+  .fixed-tag { color: var(--accent2); font-size: 11px; font-family: 'DM Mono', monospace; font-weight: 600; }
+  .amount-cell { font-family: 'DM Mono', monospace; font-weight: 500; }
+  .notes-cell { color: var(--muted); font-size: 12px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .action-cell { display: flex; gap: 6px; }
+  input[type=number], input[type=text], textarea, select {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 10px; border-radius: 6px; font-size: 13px; font-family: 'DM Sans', sans-serif;
+    width: 100%; outline: none; transition: border 0.15s;
+  }
+  input:focus, textarea:focus, select:focus { border-color: var(--accent); }
+  textarea { resize: vertical; min-height: 60px; }
+
+  /* ANNUAL VIEW */
+  .annual-grid { display: grid; grid-template-columns: 200px repeat(12,1fr); gap: 0; }
+  .ag-head { background: var(--surface2); padding: 8px 10px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); font-family: 'DM Mono', monospace; border: 1px solid var(--border); }
+  .ag-cell { padding: 7px 10px; font-family: 'DM Mono', monospace; font-size: 12px; border: 1px solid var(--border); text-align: right; }
+  .ag-label { font-family: 'DM Sans', sans-serif; font-size: 12px; padding: 7px 12px; border: 1px solid var(--border); }
+  .ag-row-total { background: rgba(37,99,235,0.04); }
+  .ag-row-total .ag-cell, .ag-row-total .ag-label { color: var(--accent); font-weight: 600; }
+  .ag-row-income .ag-cell { color: var(--income); }
+  .ag-row-saving .ag-cell { color: var(--accent); }
+  .ag-neg { color: var(--danger) !important; }
+  .annual-wrap { overflow-x: auto; }
+
+  /* CHARTS */
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px; }
+  .chart-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 16px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; }
+  canvas { max-height: 220px; }
+
+  /* BAR CHART manual */
+  .bar-chart { display: flex; flex-direction: column; gap: 8px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; }
+  .bar-label { width: 130px; font-size: 12px; color: var(--muted); text-align: right; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bar-track { flex: 1; height: 20px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; background: var(--accent); }
+  .bar-value { width: 70px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text); }
+
+  /* LINE CHART manual */
+  .line-svg { width: 100%; height: 180px; }
+
+  /* MODAL */
+  .modal-bg {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 200; align-items: center; justify-content: center;
+  }
+  .modal-bg.open { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 28px; width: 440px; max-width: 96vw; max-height: 90vh; overflow-y: auto;
+  }
+  .modal h3 { font-size: 16px; font-weight: 600; margin-bottom: 20px; }
+  .form-row { margin-bottom: 14px; }
+  .form-label { font-size: 12px; color: var(--muted); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .checkbox-row { display: flex; align-items: center; gap: 8px; }
+  input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--accent); color: #ffffff;
+    padding: 10px 20px; border-radius: 8px; font-weight: 600; font-size: 13px;
+    z-index: 300; opacity: 0; transform: translateY(10px);
+    transition: all 0.3s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+
+  .empty-state { text-align: center; padding: 48px; color: var(--muted); font-size: 14px; }
+
+  .pending-badge { font-size:10px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);padding:1px 6px;border-radius:4px;font-family:'DM Mono',monospace;vertical-align:middle;margin-left:4px; }
+  tr.is-pending td { opacity:0.5; font-style:italic; }
+
+  /* IMPORT & MERCHANTS */
+  .review-item { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px 16px; display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
+  .review-merchant { font-size:13px; font-weight:600; font-family:'DM Mono',monospace; }
+  .review-meta { font-size:11px; color:var(--muted); margin-top:2px; }
+  .review-amount { font-family:'DM Mono',monospace; font-size:15px; font-weight:600; color:var(--danger); white-space:nowrap; }
+  .review-selects { display:flex; gap:8px; margin-top:8px; grid-column:1/-1; }
+  .known-badge { color:var(--income); font-size:10px; font-weight:700; margin-left:6px; }
+  .merchant-group { margin-bottom:20px; }
+  .merchant-group-title { font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); padding:8px 0 6px; border-bottom:1px solid var(--border); margin-bottom:8px; font-weight:600; }
+  .merchant-row { display:flex; align-items:center; gap:12px; padding:7px 0; border-bottom:1px solid var(--border); }
+  .merchant-row:last-child { border-bottom:none; }
+  .merchant-name { flex:1; font-size:13px; font-family:'DM Mono',monospace; }
+  .merchant-count { font-size:11px; color:var(--muted); width:60px; text-align:right; }
+  .spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; vertical-align:middle; margin-right:6px; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  /* DETAIL MODAL */
+  .detail-modal { width: 540px; }
+  .detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .detail-header h3 { font-size: 16px; font-weight: 600; }
+  .detail-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .detail-table { width: 100%; border-collapse: collapse; }
+  .detail-table th { text-align: left; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .detail-table td { padding: 9px 12px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .detail-table tr:last-child td { border-bottom: none; }
+  .detail-table tr:hover td { background: var(--surface2); }
+  .detail-total { display: flex; justify-content: space-between; align-items: center; margin-top: 16px; padding-top: 14px; border-top: 2px solid var(--border); font-weight: 600; }
+  .detail-total-val { font-family: 'DM Mono', monospace; font-size: 18px; color: var(--accent); }
+  .ag-cell-link { cursor: pointer; }
+  .ag-cell-link:hover { background: rgba(37,99,235,0.07) !important; color: var(--accent); text-decoration: underline; }
+  .cat-badge-link { cursor: pointer; }
+  .cat-badge-link:hover { background: rgba(37,99,235,0.1); color: var(--accent); }
+
+  .data-menu-item {
+    display:block; width:100%; text-align:left; background:none; border:none;
+    padding:9px 14px; font-size:13px; font-family:'DM Sans',sans-serif;
+    color:var(--text); cursor:pointer; border-radius:7px; transition:background 0.12s;
+  }
+  .data-menu-item:hover { background:var(--surface2); }
+  .data-menu-item.danger { color:var(--danger); }
+
+  /* FORMAT CONFIGURATOR */
+  .fmt-line { display:flex; align-items:center; gap:6px; padding:5px 8px; border-radius:6px; font-family:'DM Mono',monospace; font-size:12px; background:var(--surface2); border:1px solid var(--border); cursor:pointer; transition:border-color 0.15s; }
+  .fmt-line:hover { border-color: var(--accent); }
+  .fmt-line.sel-name  { border-color:var(--accent); background:rgba(37,99,235,0.07); }
+  .fmt-line.sel-date  { border-color:var(--income); background:rgba(22,163,74,0.07); }
+  .fmt-line.sel-amount{ border-color:var(--danger); background:rgba(220,38,38,0.07); }
+  .fmt-line.sel-skip  { opacity:0.4; text-decoration:line-through; }
+  .fmt-pill { font-size:10px; font-weight:700; padding:1px 6px; border-radius:4px; white-space:nowrap; }
+  .fmt-pill-name   { background:rgba(37,99,235,0.15); color:var(--accent); }
+  .fmt-pill-date   { background:rgba(22,163,74,0.15); color:var(--income); }
+  .fmt-pill-amount { background:rgba(220,38,38,0.15); color:var(--danger); }
+  .fmt-pill-skip   { background:var(--surface2); color:var(--muted); }
+
+  /* ANALYSIS TAB */
+  .analysis-selectors { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
+  .analysis-selectors label { font-size:12px; color:var(--muted); }
+  .analysis-selectors select { font-size:13px; padding:6px 10px; }
+  .analysis-wrap { max-width:100%; }
+  .analysis-summary { display:flex; flex-direction:column; gap:6px; margin-bottom:16px; }
+  .an-card { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:9px 14px; display:flex; align-items:center; gap:12px; }
+  .an-card-label { font-size:10px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); margin-bottom:2px; }
+  .an-card-value { font-family:'DM Mono',monospace; font-size:15px; font-weight:600; }
+  .an-card-delta { font-size:12px; margin-top:4px; font-family:'DM Mono',monospace; }
+  .delta-pos { color:var(--income); }
+  .delta-neg { color:var(--danger); }
+  .delta-neu { color:var(--muted); }
+  .analysis-table { width:100%; border-collapse:collapse; font-size:13px; }
+  .analysis-table th { background:var(--surface2); padding:9px 14px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); border:1px solid var(--border); white-space:nowrap; }
+  .analysis-table td { padding:9px 14px; border:1px solid var(--border); vertical-align:middle; }
+  .analysis-table tr:hover td { background:rgba(0,0,0,0.02); }
+  .an-new-badge { background:rgba(22,163,74,0.1); color:var(--income); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; margin-left:6px; }
+  .an-gone-badge { background:rgba(220,38,38,0.08); color:var(--danger); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; margin-left:6px; }
+  .an-bar-wrap { display:flex; align-items:center; gap:8px; }
+  .an-bar { height:6px; border-radius:3px; transition:width .3s; }
+
+
+  @media(max-width:900px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .annual-grid { grid-template-columns: 120px repeat(12,1fr); }
+  }
+  @media(max-width:600px) {
+    .cards { grid-template-columns: 1fr 1fr; }
+    .app { padding: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">despeses//</div>
+    <div class="login-sub">Gestió de despeses personals</div>
+    <div class="login-tabs">
+      <button class="login-tab active" onclick="showLoginTab('login')">Entrar</button>
+      <button class="login-tab" onclick="showLoginTab('register')">Registrar-se</button>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Correu electrònic</div>
+      <input type="email" id="login-email" placeholder="correu@exemple.com" autocomplete="email">
+    </div>
+    <div class="form-row" id="login-name-row" style="display:none">
+      <div class="form-label">Nom</div>
+      <input type="text" id="login-name" placeholder="El teu nom">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Contrasenya</div>
+      <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="btn" style="width:100%" id="login-btn" onclick="doLogin()">Entrar</button>
+    <div style="margin-top:12px;text-align:center">
+      <button class="btn ghost" style="width:100%;font-size:12px" onclick="doResetPassword()">He oblidat la contrasenya</button>
+    </div>
+  </div>
+</div>
+
+<div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
+<header>
+  <div class="header-top">
+    <div class="logo">despeses//</div>
+    <div class="header-right">
+      <select class="year-select" id="userSelect" onchange="switchUser(this.value)" title="Usuari actiu" style="max-width:110px"></select>
+      <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
+      <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
+      <div style="position:relative">
+        <span id="userEmailBadge" style="font-size:11px;color:var(--muted);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+    <button class="btn ghost" style="font-size:12px;padding:5px 10px" onclick="toggleDataMenu()" id="dataMenuBtn">⚙</button>
+        <div id="dataMenu" style="display:none;position:absolute;right:0;top:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.12);z-index:200;min-width:210px;padding:6px">
+          <button class="data-menu-item" onclick="openUserModal()">👤 Gestionar usuaris</button>
+        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+        <button class="data-menu-item" onclick="exportBackup()">↑ Exportar backup</button>
+          <button class="data-menu-item" onclick="document.getElementById('importBackupFile').click()">↓ Restaurar backup</button>
+          <input type="file" id="importBackupFile" accept=".json" style="display:none" onchange="importBackup(event)">
+          <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+          <button class="data-menu-item" onclick="openResetModal()">↺ Esborrar dades...</button>
+        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+        <button class="data-menu-item" style="color:var(--danger)" onclick="doLogout()">⏻ Tancar sessió</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="header-nav">
+    <nav>
+      <button class="active" onclick="showTab('mes')">Mes</button>
+      <button onclick="showTab('anual')">Anual</button>
+      <button onclick="showTab('grafics')">Gràfics</button>
+      <button onclick="showTab('categories')">Categories</button>
+      <button onclick="showTab('merchants')">Comerços</button>
+      <button onclick="showTab('analisi')">Anàlisi</button>
+    </nav>
+  </div>
+</header>
+
+<!-- MES VIEW -->
+<div class="app visible" id="tab-mes">
+  <div class="cards">
+    <div class="card income">
+      <div class="card-label">Nòmina</div>
+      <div class="card-value" id="c-nomina">—</div>
+      <div class="card-sub" id="c-nomina-anual"></div>
+    </div>
+    <div class="card expense">
+      <div class="card-label">Despeses</div>
+      <div class="card-value" id="c-despeses">—</div>
+    </div>
+    <div class="card saving">
+      <div class="card-label">Estalvi</div>
+      <div class="card-value" id="c-estalvi">—</div>
+    </div>
+    <div class="card fixed">
+      <div class="card-label">Fixes</div>
+      <div class="card-value" id="c-fixes">—</div>
+      <div class="card-sub" id="c-variable"></div>
+    </div>
+  </div>
+
+  <div class="month-tabs" id="monthTabs"></div>
+
+  <div class="section-header">
+    <div class="section-title" id="mesTitle">Despeses del mes</div>
+    <button class="btn" onclick="openAddModal()">+ Afegir despesa</button>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Categoria</th>
+          <th>Import</th>
+          <th>Tipus</th>
+          <th>Notes</th>
+          <th>Accions</th>
+        </tr>
+      </thead>
+      <tbody id="expenseTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ANUAL VIEW -->
+<div class="app" id="tab-anual">
+  <div class="section-header">
+    <div class="section-title" id="anualTitle">Resum Anual</div>
+  </div>
+  <!-- Summary KPI cards -->
+  <div id="annualSummary" style="margin-bottom:20px"></div>
+  <!-- Category breakdown bar chart -->
+  <div id="annualCatBreakdown" style="margin-bottom:20px"></div>
+  <div class="annual-wrap">
+    <div class="annual-grid" id="annualGrid"></div>
+  </div>
+</div>
+
+<!-- ANALISI VIEW -->
+<div class="app" id="tab-analisi">
+  <div class="analysis-wrap">
+    <div class="section-header" style="flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div class="section-title">Comparativa entre anys</div>
+      <div class="analysis-selectors" style="margin-bottom:0">
+        <label>Any base
+          <select id="an-year-a" onchange="renderAnalysis()" style="margin-left:6px"></select>
+        </label>
+        <span style="color:var(--muted);font-size:18px">→</span>
+        <label>Any comparar
+          <select id="an-year-b" onchange="renderAnalysis()" style="margin-left:6px"></select>
+        </label>
+      </div>
+    </div>
+    <div id="analysis-summary" class="analysis-summary"></div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow-x:auto">
+      <table class="analysis-table" id="analysis-table"></table>
+    </div>
+  </div>
+</div>
+
+<!-- GRAFICS VIEW -->
+<div class="app" id="tab-grafics">
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Despeses per categoria (any)</div>
+      <div class="bar-chart" id="catBarChart"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Evolució mensual</div>
+      <svg class="line-svg" id="lineSvg" viewBox="0 0 600 200"></svg>
+    </div>
+  </div>
+  <div class="charts-grid">
+    <div class="chart-card">
+      <div class="chart-title">Nòmina vs Despeses (mensual)</div>
+      <svg class="line-svg" id="lineSvg2" viewBox="0 0 600 200"></svg>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Estalvi acumulat</div>
+      <svg class="line-svg" id="lineSvg3" viewBox="0 0 600 200"></svg>
+    </div>
+  </div>
+  <div class="chart-card" style="margin-bottom:24px">
+    <div class="chart-title">Despeses totals per any — comparativa</div>
+    <svg id="multiYearSvg" viewBox="0 0 900 260" style="width:100%;height:260px"></svg>
+    <div id="multiYearLegend" style="display:flex;gap:20px;flex-wrap:wrap;margin-top:12px"></div>
+  </div>
+  <div class="chart-card" style="margin-bottom:24px">
+    <div class="chart-title">Comparativa per categories i any</div>
+    <div style="overflow-x:auto">
+      <table id="compareTable" style="width:100%;border-collapse:collapse;font-size:12px"></table>
+    </div>
+  </div>
+</div>
+
+<!-- MERCHANTS VIEW -->
+<div class="app" id="tab-merchants">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Comerços coneguts</div>
+      <div id="merchantCount" style="font-size:12px;color:var(--muted);margin-top:2px"></div>
+    </div>
+    <input type="text" id="merchantSearch" placeholder="Cercar comerç..." style="width:220px" oninput="renderMerchants()">
+  </div>
+  <div id="merchantsContainer"></div>
+</div>
+
+<!-- CATEGORIES VIEW -->
+<div class="app" id="tab-categories">
+  <div class="section-header">
+    <div class="section-title">Categories</div>
+    <button class="btn" onclick="openCatModal()">+ Nova categoria</button>
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Nom</th><th>Tipus</th><th>Color</th><th>Accions</th></tr>
+      </thead>
+      <tbody id="catTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ADD/EDIT EXPENSE MODAL -->
+<div class="modal-bg" id="expenseModal">
+  <div class="modal">
+    <h3 id="modalTitle">Afegir despesa</h3>
+    <div class="form-row">
+      <div class="form-label">Categoria</div>
+      <select id="f-cat" onchange="handleCatSelect('f-cat')"></select>
+    </div>
+    <div class="form-row">
+      <div class="form-label" style="display:flex;justify-content:space-between;align-items:center">
+        <span>Import (€)</span>
+        <div style="display:flex;gap:4px">
+          <button type="button" id="sign-neg" onclick="setSign(-1)" style="padding:2px 10px;border-radius:5px;border:1px solid var(--border);background:var(--danger);color:white;font-size:11px;cursor:pointer;font-weight:600">− Despesa</button>
+          <button type="button" id="sign-pos" onclick="setSign(1)" style="padding:2px 10px;border-radius:5px;border:1px solid var(--border);background:var(--surface2);color:var(--muted);font-size:11px;cursor:pointer">+ Ingrés</button>
+        </div>
+      </div>
+      <input type="number" id="f-amount" step="0.01" min="0" placeholder="0.00" style="width:100%">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Notes</div>
+      <input type="text" id="f-notes" placeholder="Descripció opcional...">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Data</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input type="number" id="f-day" min="1" max="31" placeholder="Dia (opcional)" style="width:140px">
+        <select id="f-month" style="flex:1"></select>
+        <select id="f-year" style="width:90px"></select>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">Deixa el dia en blanc si no vols especificar-lo</div>
+    </div>
+    <div class="form-row" style="margin-bottom:4px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2)">
+        <input type="checkbox" id="f-pending" style="accent-color:var(--muted);width:15px;height:15px">
+        <div>
+          <div style="font-size:13px;font-weight:500">No comptar als totals</div>
+          <div style="font-size:11px;color:var(--muted)">Apareix a la llista però no suma a gràfiques ni resums</div>
+        </div>
+      </label>
+    </div>
+    <div class="form-actions">
+      <button class="btn ghost" onclick="closeModal('expenseModal')">Cancel·lar</button>
+      <button class="btn" onclick="saveExpense()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- CAT MODAL -->
+<div class="modal-bg" id="catModal">
+  <div class="modal">
+    <h3 id="catModalTitle">Nova categoria</h3>
+    <div class="form-row">
+      <div class="form-label">Nom</div>
+      <input type="text" id="cf-name" placeholder="Nom de la categoria">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Tipus</div>
+      <select id="cf-type">
+        <option value="variable">Variable</option>
+        <option value="fixa">Fixa</option>
+        <option value="ingressos">Ingressos</option>
+      </select>
+    </div>
+    <div class="form-actions">
+      <button class="btn ghost" onclick="closeModal('catModal')">Cancel·lar</button>
+      <button class="btn" onclick="saveCat()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="detailModal">
+  <div class="modal detail-modal">
+    <div class="detail-header">
+      <div>
+        <h3 id="detail-title">Detall</h3>
+        <div class="detail-sub" id="detail-sub"></div>
+      </div>
+      <button class="btn ghost sm" onclick="closeModal('detailModal')">✕</button>
+    </div>
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>Data</th>
+          <th>Import</th>
+          <th>Notes</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="detail-tbody"></tbody>
+    </table>
+    <div class="detail-total">
+      <span>Total</span>
+      <span class="detail-total-val" id="detail-total"></span>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div class="modal-bg" id="importModal">
+  <div class="modal" style="width:560px;max-height:95vh">
+    <h3>Importar extracte bancari</h3>
+
+    <!-- Format selector -->
+    <div class="form-row" style="margin-bottom:10px">
+      <div class="form-label" style="display:flex;justify-content:space-between">
+        <span>Format</span>
+        <button class="btn ghost sm" onclick="openFormatConfig()">+ Nou format</button>
+      </div>
+      <select id="import-format" style="width:100%" onchange="onFormatChange()">
+      </select>
+    </div>
+
+    <div class="form-row">
+      <div class="form-label">Text de l'extracte</div>
+      <textarea id="importText" style="min-height:150px;font-family:'DM Mono',monospace;font-size:12px" placeholder="Enganxa aquí el text copiat del banc..."></textarea>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Mes destí</div>
+      <div style="display:flex;gap:10px">
+        <select id="import-month" style="flex:1"></select>
+        <select id="import-year" style="flex:1"></select>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn ghost" onclick="closeModal('importModal')">Cancel·lar</button>
+      <button class="btn" id="importAnalyzeBtn" onclick="analyzeImport()">Analitzar</button>
+    </div>
+  </div>
+</div>
+
+<!-- FORMAT CONFIGURATOR MODAL -->
+<div class="modal-bg" id="formatModal">
+  <div class="modal" style="width:520px;max-height:95vh">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3 id="fmtModalTitle">Nou format de banc</h3>
+      <button class="btn ghost sm" onclick="closeModal('formatModal')">✕</button>
+    </div>
+    <div class="form-row">
+      <div class="form-label">Nom del format</div>
+      <input type="text" id="fmt-name" placeholder="Ex: Sabadell, CaixaBank...">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Exemple del teu extracte</div>
+      <p style="font-size:11px;color:var(--muted);margin-bottom:8px">Enganxa 1-2 transaccions d'exemple. Després clica cada línia per indicar si és el <span style="color:var(--accent);font-weight:600">Nom</span>, la <span style="color:var(--income);font-weight:600">Data</span>, l'<span style="color:var(--danger);font-weight:600">Import</span> o si s'ha d'<span style="color:var(--muted);font-weight:600">Ignorar</span>.</p>
+      <textarea id="fmt-sample" style="min-height:100px;font-family:'DM Mono',monospace;font-size:12px"
+        placeholder="Enganxa un exemple aquí..." oninput="parseFmtSample()"></textarea>
+    </div>
+    <!-- Line assignment UI -->
+    <div id="fmtLineAssign" style="display:none">
+      <div class="form-label" style="margin-bottom:8px">Assigna cada línia — clica per canviar el tipus:</div>
+      <div id="fmtLineList" style="display:flex;flex-direction:column;gap:5px;margin-bottom:14px;max-height:200px;overflow-y:auto"></div>
+      <!-- Legend -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;font-size:11px">
+        <span class="fmt-pill fmt-pill-name">NOM</span> Nom del comerç &nbsp;
+        <span class="fmt-pill fmt-pill-date">DATA</span> Data &nbsp;
+        <span class="fmt-pill fmt-pill-amount">IMPORT</span> Import &nbsp;
+        <span class="fmt-pill fmt-pill-skip">IGNORAR</span> Línia a saltar (saldo, etc.)
+      </div>
+      <div id="fmtValidation" style="font-size:12px;margin-bottom:10px"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn ghost" onclick="closeModal('formatModal')">Cancel·lar</button>
+      <button class="btn" onclick="saveFormat()">Guardar format</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT REVIEW MODAL -->
+<div class="modal-bg" id="reviewModal">
+  <div class="modal" style="width:680px;max-height:90vh">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h3>Revisar despeses importades</h3>
+      <button class="btn ghost sm" onclick="closeModal('reviewModal')">✕</button>
+    </div>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:16px">Assigna la categoria correcta a cada despesa. Les categories marcades amb ★ s'han recordat d'importacions anteriors.</p>
+    <div id="reviewList" style="display:flex;flex-direction:column;gap:10px;max-height:55vh;overflow-y:auto;padding-right:4px"></div>
+    <div id="importResult" style="display:none;margin-top:16px;padding:14px 16px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);font-size:13px"></div>
+    <!-- DUP DETAIL panel (inline, hidden until clicked) -->
+    <div id="dupDetail" style="display:none;margin-top:16px;padding:16px;border-radius:10px;background:var(--surface2);border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+        <button class="btn ghost sm" onclick="closeDupDetail()">← Tornar</button>
+        <span style="font-size:13px;font-weight:600" id="dupDetail-title"></span>
+      </div>
+      <div id="dupDetail-body" style="font-size:13px;margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <select id="dup-cat" style="flex:1;font-size:12px"></select>
+        <input type="text" id="dup-notes" placeholder="Notes..." style="flex:2;font-size:12px">
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn ghost" onclick="closeDupDetail()">← Tornar</button>
+        <button class="btn" onclick="importDupRow()">Importar igualment</button>
+      </div>
+    </div>
+    <div class="form-actions" id="importActions" style="margin-top:16px">
+      <button class="btn ghost" onclick="closeModal('reviewModal')">Cancel·lar</button>
+      <button class="btn" id="confirmImportBtn" onclick="confirmImport()">Guardar totes</button>
+      <button class="btn" id="importSkippedBtn" style="display:none" onclick="importMarkedDups()">Importar seleccionades</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESET MODAL -->
+<div class="modal-bg" id="resetModal">
+  <div class="modal" style="width:440px">
+    <h3 style="margin-bottom:6px">Esborrar dades</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:20px">Tria quines dades vols esborrar. Aquesta acció no es pot desfer.</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px">
+      <label style="display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:8px;cursor:pointer">
+        <input type="radio" name="resetScope" value="month" checked style="accent-color:var(--accent)">
+        <div><div style="font-weight:600;font-size:13px">Mes actual</div><div style="font-size:11px;color:var(--muted)" id="resetScopeMonthLabel"></div></div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:8px;cursor:pointer">
+        <input type="radio" name="resetScope" value="year" style="accent-color:var(--accent)">
+        <div><div style="font-weight:600;font-size:13px">Any actual</div><div style="font-size:11px;color:var(--muted)" id="resetScopeYearLabel"></div></div>
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--border);border-radius:8px;cursor:pointer">
+        <input type="radio" name="resetScope" value="all" style="accent-color:var(--danger)">
+        <div><div style="font-weight:600;font-size:13px;color:var(--danger)">Tot — esborrar absolutament tot</div><div style="font-size:11px;color:var(--muted)">Categories i comerços inclosos</div></div>
+      </label>
+    </div>
+    <div class="form-actions">
+      <button class="btn ghost" onclick="closeModal('resetModal')">Cancel·lar</button>
+      <button class="btn danger" onclick="confirmReset()">Esborrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- USER MODAL -->
+<div class="modal-bg" id="userModal">
+  <div class="modal" style="width:420px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h3>Usuaris</h3>
+      <button class="btn ghost sm" onclick="closeModal('userModal')">✕</button>
+    </div>
+    <div id="userList" style="margin-bottom:16px"></div>
+    <button class="btn ghost" style="width:100%" onclick="addUser()">+ Nou usuari</button>
+  </div>
+</div>
+
+<!-- BACKUP MERGE MODAL -->
+<div class="modal-bg" id="backupMergeModal">
+  <div class="modal" style="width:600px;max-height:90vh">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <h3>Restaurar backup</h3>
+      <button class="btn ghost sm" onclick="closeModal('backupMergeModal')">✕</button>
+    </div>
+    <div id="backupMergeSummary" style="margin-bottom:16px;font-size:13px"></div>
+    <div id="backupMergeDups" style="max-height:40vh;overflow-y:auto;margin-bottom:16px"></div>
+    <div class="form-actions">
+      <button class="btn ghost" onclick="closeModal('backupMergeModal')">Cancel·lar</button>
+      <button class="btn" id="backupMergeConfirmBtn" onclick="confirmBackupMerge()">Combinar i restaurar</button>
+    </div>
+  </div>
+</div>
+
+<!-- QUICK CAT MODAL -->
+<div class="modal-bg" id="quickCatModal">
+  <div class="modal" style="width:360px">
+    <h3 style="margin-bottom:16px">Nova categoria</h3>
+    <div class="form-row">
+      <div class="form-label">Nom</div>
+      <input type="text" id="qcat-name" placeholder="Nom de la categoria" oninput="validateQuickCat()">
+    </div>
+    <div class="form-row">
+      <div class="form-label">Tipus</div>
+      <select id="qcat-type">
+        <option value="variable">Variable</option>
+        <option value="fixa">Fixa</option>
+        <option value="ingressos">Ingressos</option>
+      </select>
+    </div>
+    <div id="qcat-error" style="font-size:12px;color:var(--danger);min-height:16px;margin-bottom:4px"></div>
+    <div class="form-actions">
+      <button class="btn ghost" onclick="closeModal('quickCatModal')">Cancel·lar</button>
+      <button class="btn" id="qcat-save" onclick="saveQuickCat()">Crear i seleccionar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// DATA STORE
+// ============================================================
+const MONTHS = ['Gener','Febrer','Març','Abril','Maig','Juny','Juliol','Agost','Setembre','Octubre','Novembre','Desembre'];
+const DB_NAME = 'despeses_app';
+const DB_VER = 2;
+let db;
+let merchants = {}; // name -> {cat, count}
+
+// Default categories
+const DEFAULT_CATS = [
+  {id:'nomina', name:'Nòmina', type:'ingressos'},
+  {id:'hipoteca', name:'Hipoteca/Lloguer', type:'fixa'},
+  {id:'llum', name:'Llum', type:'fixa'},
+  {id:'aigua', name:'Aigua', type:'fixa'},
+  {id:'gas', name:'Gas', type:'fixa'},
+  {id:'comunitat', name:'Comunitat', type:'fixa'},
+  {id:'telefon', name:'Telèfon', type:'fixa'},
+  {id:'cup', name:'CUP', type:'fixa'},
+  {id:'barca', name:'Barça', type:'fixa'},
+  {id:'collegi', name:"Col·legi", type:'fixa'},
+  {id:'parking', name:'Parking', type:'fixa'},
+  {id:'netflix', name:'Netflix et al', type:'fixa'},
+  {id:'gamepass', name:'Gamepass', type:'fixa'},
+  {id:'fons', name:'Fons', type:'fixa'},
+  {id:'asseg_llar', name:'Assegurança llar', type:'fixa'},
+  {id:'ibi', name:'IBI', type:'fixa'},
+  {id:'asseg_moto', name:'Asseg moto', type:'fixa'},
+  {id:'piscina', name:'Piscina', type:'fixa'},
+  {id:'gimnàs', name:'Gimnàs', type:'variable'},
+  {id:'menjar', name:'Menjar+super', type:'variable'},
+  {id:'bar', name:'Restaurant/Bar', type:'variable'},
+  {id:'vacances', name:'Vacances', type:'variable'},
+  {id:'altres', name:'Altres', type:'variable'},
+  {id:'benzina', name:'Benzina', type:'variable'},
+  {id:'neteja', name:'Neteja', type:'variable'},
+];
+
+// Pre-loaded historical data (year -> month(0-11) -> [{cat, amount, notes}])
+const SEED_DATA = {
+  2021: {
+    0:[{cat:'nomina',amount:2333.64},{cat:'hipoteca',amount:700},{cat:'llum',amount:93.92},{cat:'aigua',amount:36.35},{cat:'comunitat',amount:154},{cat:'telefon',amount:41.99},{cat:'parking',amount:25},{cat:'menjar',amount:400},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
+    1:[{cat:'nomina',amount:2786.11},{cat:'hipoteca',amount:700},{cat:'llum',amount:94.38},{cat:'comunitat',amount:60},{cat:'telefon',amount:41.99},{cat:'parking',amount:25},{cat:'menjar',amount:400},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
+    2:[{cat:'nomina',amount:3053.8},{cat:'hipoteca',amount:700},{cat:'llum',amount:53.14},{cat:'aigua',amount:38.2},{cat:'telefon',amount:41.99},{cat:'cup',amount:60},{cat:'parking',amount:25},{cat:'menjar',amount:400},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
+    3:[{cat:'nomina',amount:5427.16},{cat:'hipoteca',amount:700},{cat:'llum',amount:70.22},{cat:'comunitat',amount:154},{cat:'telefon',amount:80.99},{cat:'parking',amount:25},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:400},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
+    4:[{cat:'nomina',amount:2897.88},{cat:'hipoteca',amount:700},{cat:'llum',amount:75.4},{cat:'aigua',amount:36.35},{cat:'telefon',amount:74.58},{cat:'parking',amount:25.99},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:79.93},{cat:'menjar',amount:82.99},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
+    5:[{cat:'nomina',amount:4029.44,notes:'nom+pis'},{cat:'hipoteca',amount:922.79},{cat:'llum',amount:69.58},{cat:'telefon',amount:66.67},{cat:'cup',amount:60},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:126},{cat:'altres',amount:681.5,notes:'farm+bar+dent+hisenda'},{cat:'benzina',amount:9.43},{cat:'neteja',amount:80}],
+    6:[{cat:'nomina',amount:4095,notes:'nom+pis'},{cat:'hipoteca',amount:1526.3},{cat:'aigua',amount:55.94},{cat:'comunitat',amount:154},{cat:'telefon',amount:66.6},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:146},{cat:'altres',amount:980.23,notes:'bicing+dent+vacances'},{cat:'benzina',amount:10},{cat:'neteja',amount:80}],
+    7:[{cat:'nomina',amount:3129},{cat:'hipoteca',amount:789.9},{cat:'telefon',amount:101.4},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:71.22},{cat:'menjar',amount:298},{cat:'altres',amount:1201,notes:'pintura+diposit com+mudança'},{cat:'benzina',amount:10}],
+    8:[{cat:'nomina',amount:2977},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:33.68},{cat:'aigua',amount:25.5},{cat:'gas',amount:36.3},{cat:'telefon',amount:65.65},{cat:'cup',amount:60},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:182},{cat:'altres',amount:505,notes:'amazon+drogueria+vacances+dentista'},{cat:'neteja',amount:80}],
+    9:[{cat:'nomina',amount:2957},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:42.4},{cat:'gas',amount:8.61},{cat:'comunitat',amount:154},{cat:'telefon',amount:67.99},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:65},{cat:'altres',amount:980,notes:'llibres, farm,teatre,roma,dentista,bambes'},{cat:'benzina',amount:10},{cat:'neteja',amount:110}],
+    10:[{cat:'nomina',amount:2999},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:37.53},{cat:'aigua',amount:44.44},{cat:'gas',amount:28.31},{cat:'telefon',amount:67.99},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:71.22},{cat:'menjar',amount:166.7},{cat:'altres',amount:950,notes:'brita, ps4, neu, assecadora'},{cat:'benzina',amount:20.6},{cat:'neteja',amount:110}],
+    11:[{cat:'nomina',amount:2684},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:39.16},{cat:'cup',amount:60},{cat:'barca',amount:195},{cat:'collegi',amount:61.6},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'piscina',amount:96.42},{cat:'menjar',amount:210.78},{cat:'altres',amount:1026.7,notes:'neu, lotr, liceu, llibres'},{cat:'benzina',amount:10.42},{cat:'neteja',amount:165}],
+  },
+  2022: {
+    0:[{cat:'nomina',amount:2582.06},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:59.83},{cat:'aigua',amount:44.44},{cat:'gas',amount:24.77},{cat:'comunitat',amount:154},{cat:'telefon',amount:67.99},{cat:'collegi',amount:61.6},{cat:'parking',amount:25.33},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'menjar',amount:203},{cat:'altres',amount:917,notes:'metro, moto, llibre, tests,xbox, sudadera, barça'},{cat:'benzina',amount:10.23},{cat:'neteja',amount:110}],
+    1:[{cat:'nomina',amount:3660,notes:'bonus mil'},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:105.12},{cat:'comunitat',amount:60},{cat:'telefon',amount:67.99},{cat:'parking',amount:84},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:71.22},{cat:'menjar',amount:127},{cat:'altres',amount:394.29,notes:'climbat, sharma, garrotxa,llibres,avinentesa, ferreteria'},{cat:'benzina',amount:29.2},{cat:'neteja',amount:55}],
+    2:[{cat:'nomina',amount:3124.44},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:62.59},{cat:'aigua',amount:43.5},{cat:'gas',amount:40.5},{cat:'telefon',amount:67.99},{cat:'cup',amount:60},{cat:'parking',amount:0},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:45.73},{cat:'menjar',amount:170},{cat:'altres',amount:238,notes:'plc, metro,aniv'},{cat:'benzina',amount:33}],
+    3:[{cat:'nomina',amount:5729.92},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:76.28},{cat:'comunitat',amount:154},{cat:'telefon',amount:84.65},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:173},{cat:'altres',amount:799,notes:'farm,soterrani,girona,sj,moto,sudadera'},{cat:'benzina',amount:20},{cat:'neteja',amount:55}],
+    4:[{cat:'nomina',amount:3362.7},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:87.02},{cat:'aigua',amount:43.85},{cat:'gas',amount:23.52},{cat:'telefon',amount:67.99},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:104},{cat:'altres',amount:168,notes:'teatre,cine,llibres,farmacia, roda'},{cat:'benzina',amount:20},{cat:'neteja',amount:110}],
+    5:[{cat:'nomina',amount:3112},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:27.64},{cat:'comunitat',amount:60},{cat:'telefon',amount:67.99},{cat:'cup',amount:60},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:83.23},{cat:'ibi',amount:489.89},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:125},{cat:'altres',amount:960,notes:'farm, port aventura, samarretes, girona, hisenda'},{cat:'benzina',amount:28},{cat:'neteja',amount:110}],
+    6:[{cat:'nomina',amount:3454},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:44.36},{cat:'aigua',amount:43.85},{cat:'gas',amount:33.02},{cat:'comunitat',amount:154},{cat:'telefon',amount:67.99},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:148},{cat:'bar',amount:0},{cat:'altres',amount:839,notes:'multa, afeit, avio alb, dent,cine, poster jp'},{cat:'benzina',amount:31.64},{cat:'neteja',amount:110}],
+    7:[{cat:'nomina',amount:3039},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:44.34},{cat:'telefon',amount:67.99},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.71},{cat:'asseg_moto',amount:8.84},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:104},{cat:'altres',amount:1213,notes:'albania, sitges kayak, zarautz, farm, ferret'},{cat:'benzina',amount:16}],
+    8:[{cat:'nomina',amount:3069},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:60.22},{cat:'aigua',amount:51},{cat:'telefon',amount:67.99},{cat:'cup',amount:60},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:14.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'bar',amount:72},{cat:'menjar',amount:105},{cat:'altres',amount:596,notes:'alb, sotana,pica'},{cat:'benzina',amount:8}],
+    9:[{cat:'nomina',amount:3296.9},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:64},{cat:'gas',amount:29.67},{cat:'comunitat',amount:154},{cat:'telefon',amount:77.98},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'bar',amount:53},{cat:'menjar',amount:141},{cat:'altres',amount:319,notes:'fifa, soterrani, estamos,ruina, barça, bambes, humitat aire'},{cat:'benzina',amount:27.6},{cat:'neteja',amount:55}],
+    10:[{cat:'nomina',amount:3071,notes:'amortitz'},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:42.2},{cat:'aigua',amount:42.91},{cat:'gas',amount:27},{cat:'telefon',amount:77.98},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.71},{cat:'gimnàs',amount:48.85},{cat:'bar',amount:44.12},{cat:'menjar',amount:106},{cat:'altres',amount:2196,notes:'jaqueta, disney, llibreta, universal, sonic, jerseis'},{cat:'benzina',amount:22.95}],
+    11:[{cat:'nomina',amount:2694},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:36.5},{cat:'agua',amount:0},{cat:'gas',amount:27.24},{cat:'cup',amount:60},{cat:'barca',amount:208},{cat:'telefon',amount:77.98},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:62.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.71},{cat:'gimnàs',amount:48.85},{cat:'bar',amount:119},{cat:'menjar',amount:137},{cat:'altres',amount:1063,notes:'regals, jerseis,sotana, llibres, amic inv, sofa1, texans'},{cat:'benzina',amount:17.86},{cat:'neteja',amount:110}],
+  },
+  2023: {
+    0:[{cat:'nomina',amount:2877.66},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:82.14},{cat:'aigua',amount:35.73},{cat:'gas',amount:8.4},{cat:'comunitat',amount:154},{cat:'telefon',amount:71.87},{cat:'collegi',amount:61.6},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:18.44},{cat:'fons',amount:50},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:19},{cat:'bar',amount:67},{cat:'altres',amount:1300,notes:'disney'},{cat:'benzina',amount:10},{cat:'neteja',amount:55}],
+    1:[{cat:'nomina',amount:3752,notes:'minibonus 750'},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:42.67},{cat:'gas',amount:32.7},{cat:'comunitat',amount:60},{cat:'telefon',amount:67.99},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:27.45},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.71},{cat:'gimnàs',amount:53.81},{cat:'menjar',amount:164},{cat:'bar',amount:187},{cat:'altres',amount:276,notes:'tarantino, regal,itv'},{cat:'benzina',amount:27},{cat:'neteja',amount:110}],
+    2:[{cat:'nomina',amount:3378.56,notes:'amortitz'},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:79.66},{cat:'aigua',amount:34.82},{cat:'telefon',amount:62.9},{cat:'cup',amount:60},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:27.45},{cat:'fons',amount:50},{cat:'ibi',amount:123.53},{cat:'asseg_moto',amount:144.9},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:118},{cat:'bar',amount:186},{cat:'altres',amount:1342,notes:'boda ferran, regal, sofa'},{cat:'benzina',amount:27},{cat:'neteja',amount:110}],
+    3:[{cat:'nomina',amount:4654.82},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:47.95},{cat:'comunitat',amount:154},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:15},{cat:'fons',amount:50},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:128},{cat:'bar',amount:213},{cat:'altres',amount:463,notes:'tarantino, fcb,cruilla,bici,mandoxbox'},{cat:'benzina',amount:20}],
+    4:[{cat:'nomina',amount:3227.43},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:42.85},{cat:'aigua',amount:35.79},{cat:'gas',amount:35},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:18},{cat:'fons',amount:50},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:102},{cat:'bar',amount:93},{cat:'altres',amount:129,notes:'zelda'},{cat:'benzina',amount:29}],
+    5:[{cat:'nomina',amount:3167.95},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:44.7},{cat:'comunitat',amount:154},{cat:'telefon',amount:62.9},{cat:'cup',amount:60},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:81.95},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:108},{cat:'bar',amount:168},{cat:'altres',amount:747,notes:'vols escocia, decathlon, soterrani,hisenda'},{cat:'benzina',amount:27},{cat:'neteja',amount:110}],
+    6:[{cat:'nomina',amount:3358.32},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:45},{cat:'aigua',amount:35.79},{cat:'gas',amount:22.21},{cat:'comunitat',amount:154},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'collegi',amount:64.8},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:125},{cat:'bar',amount:144},{cat:'altres',amount:1191,notes:'farm,tren liv,roba, pijama, escocia, jarque,blanes,bambes'},{cat:'benzina',amount:21},{cat:'neteja',amount:55}],
+    7:[{cat:'nomina',amount:3054},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:62},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:73.47},{cat:'asseg_moto',amount:8.84},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:113},{cat:'bar',amount:82},{cat:'altres',amount:1398,notes:'fifa,vielha, jocs,998 vacances escocia'},{cat:'benzina',amount:16},{cat:'neteja',amount:55}],
+    8:[{cat:'nomina',amount:3540},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:43.62},{cat:'aigua',amount:33.86},{cat:'telefon',amount:62.9},{cat:'cup',amount:60},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'ibi',amount:123.53},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:73},{cat:'bar',amount:88},{cat:'altres',amount:1126,notes:'998 vacances,bambes, llibre'},{cat:'benzina',amount:10},{cat:'neteja',amount:110}],
+    9:[{cat:'nomina',amount:3463.9},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:54},{cat:'gas',amount:20},{cat:'comunitat',amount:154},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:58},{cat:'bar',amount:137},{cat:'altres',amount:1829,notes:'telf,tignes, viatge delta ebre'},{cat:'benzina',amount:20},{cat:'neteja',amount:55}],
+    10:[{cat:'nomina',amount:3353.38},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:42.29},{cat:'agua',amount:0},{cat:'gas',amount:0},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:73.47},{cat:'ibi',amount:123.53},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:138},{cat:'bar',amount:45},{cat:'altres',amount:610,notes:'ruina, jaqueta neu,decathlon,farmacia'},{cat:'benzina',amount:19},{cat:'neteja',amount:55}],
+    11:[{cat:'nomina',amount:2965.99,notes:'amortitz'},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:50.42},{cat:'aigua',amount:33.86},{cat:'gas',amount:67},{cat:'cup',amount:60},{cat:'barca',amount:208},{cat:'parking',amount:40.82},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:55},{cat:'fons',amount:50},{cat:'asseg_llar',amount:73.47},{cat:'ibi',amount:123.53},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:117},{cat:'bar',amount:186},{cat:'altres',amount:1107,notes:'tignes, regals,jarque'},{cat:'benzina',amount:9},{cat:'neteja',amount:110}],
+  },
+  2024: {
+    0:[{cat:'nomina',amount:3350},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:64.47},{cat:'aigua',amount:33.86},{cat:'comunitat',amount:154},{cat:'telefon',amount:63.94},{cat:'barca',amount:215},{cat:'collegi',amount:64.8},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:25,notes:'google one'},{cat:'fons',amount:50},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:120},{cat:'bar',amount:137},{cat:'altres',amount:222,notes:'jersei, cine'},{cat:'benzina',amount:9},{cat:'neteja',amount:110}],
+    1:[{cat:'nomina',amount:3984,notes:'minibonus'},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:50.97},{cat:'aigua',amount:31},{cat:'comunitat',amount:60},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:73.47},{cat:'gimnàs',amount:55.96},{cat:'menjar',amount:73},{cat:'bar',amount:154},{cat:'altres',amount:688,notes:'dentista, lego,teatre, sabates camisa,barça,bambes'},{cat:'benzina',amount:19},{cat:'neteja',amount:110}],
+    2:[{cat:'nomina',amount:3481},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:43.23},{cat:'aigua',amount:43.5},{cat:'telefon',amount:65.19},{cat:'cup',amount:60},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'ibi',amount:124.58},{cat:'asseg_moto',amount:153.3},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:126},{cat:'bar',amount:232},{cat:'altres',amount:942,notes:'concert,boda,dentista, aniversari'},{cat:'benzina',amount:27},{cat:'neteja',amount:55}],
+    3:[{cat:'nomina',amount:7104},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:60},{cat:'gas',amount:22.78},{cat:'comunitat',amount:154},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:788,notes:'disney,madrid hotel'},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:93},{cat:'bar',amount:243},{cat:'altres',amount:810,notes:'berto, farmacia,volley, dentista,decathlon'},{cat:'benzina',amount:30}],
+    4:[{cat:'nomina',amount:3558},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:33},{cat:'aigua',amount:39.35},{cat:'gas',amount:23.89},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:82.09},{cat:'ibi',amount:124.58},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:82},{cat:'bar',amount:162},{cat:'altres',amount:907,notes:'entrades ignasi, farmacia, bilbao, madrid'},{cat:'benzina',amount:20}],
+    5:[{cat:'nomina',amount:3524},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:42},{cat:'comunitat',amount:60},{cat:'telefon',amount:65.19},{cat:'cup',amount:60},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:81},{cat:'bar',amount:159},{cat:'altres',amount:1176,notes:'volley, dentista, padel, pijama,roba, bambes'},{cat:'benzina',amount:29},{cat:'neteja',amount:110}],
+    6:[{cat:'nomina',amount:3326},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:45},{cat:'aigua',amount:39.35},{cat:'gas',amount:26.38},{cat:'comunitat',amount:179,notes:'pendent de la pujada'},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_moto',amount:8.84},{cat:'vacances',amount:311,notes:'irlanda, vielha'},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:156},{cat:'bar',amount:206},{cat:'altres',amount:943,notes:'hisenda, dentista, aixeta, ulleres'},{cat:'benzina',amount:19},{cat:'neteja',amount:110}],
+    7:[{cat:'nomina',amount:3568},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:32.65},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.05},{cat:'vacances',amount:417},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:164},{cat:'bar',amount:267},{cat:'altres',amount:220,notes:'cine, r36s, teatre'},{cat:'benzina',amount:10},{cat:'neteja',amount:110}],
+    8:[{cat:'nomina',amount:3685},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:60},{cat:'aigua',amount:37.09},{cat:'gas',amount:14.56},{cat:'telefon',amount:65.84},{cat:'cup',amount:60},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'ibi',amount:124.58},{cat:'vacances',amount:808},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:203},{cat:'bar',amount:61},{cat:'altres',amount:96},{cat:'benzina',amount:10},{cat:'neteja',amount:55}],
+    9:[{cat:'nomina',amount:3486},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:31.87},{cat:'aigua',amount:9.26},{cat:'gas',amount:8.42},{cat:'comunitat',amount:163},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:537,notes:'globus'},{cat:'gimnàs',amount:0},{cat:'menjar',amount:196},{cat:'bar',amount:203},{cat:'altres',amount:622,notes:'dragon ball sparking, fifa, barça, ferula'},{cat:'benzina',amount:29},{cat:'neteja',amount:75}],
+    10:[{cat:'nomina',amount:3811},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:23.25},{cat:'aigua',amount:37.09},{cat:'gas',amount:28.69},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.05},{cat:'ibi',amount:124.6},{cat:'vacances',amount:50,notes:'vielha'},{cat:'gimnàs',amount:288,notes:'volley'},{cat:'menjar',amount:140},{cat:'bar',amount:164},{cat:'altres',amount:653,notes:'hisenda, decathlon jaqueta, tarjeta amazon, db legends, entrades berto i ruina maig'},{cat:'benzina',amount:20},{cat:'neteja',amount:55}],
+    11:[{cat:'nomina',amount:3095},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:44.19},{cat:'cup',amount:60},{cat:'barca',amount:219},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:55,notes:'amazon'},{cat:'fons',amount:50},{cat:'ibi',amount:124.6},{cat:'menjar',amount:80},{cat:'bar',amount:210},{cat:'altres',amount:375,notes:'manga, privalia'},{cat:'benzina',amount:20},{cat:'neteja',amount:165}],
+  },
+  2025: {
+    0:[{cat:'nomina',amount:3230},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:52.34},{cat:'aigua',amount:39.65},{cat:'gas',amount:8.42},{cat:'comunitat',amount:163},{cat:'telefon',amount:65.92},{cat:'collegi',amount:67},{cat:'parking',amount:43.27},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:75,notes:'google one, amazon'},{cat:'fons',amount:50},{cat:'vacances',amount:302,notes:'vielha'},{cat:'menjar',amount:98},{cat:'bar',amount:155},{cat:'altres',amount:993,notes:'privalia, escalfador'},{cat:'benzina',amount:20},{cat:'neteja',amount:55}],
+    1:[{cat:'nomina',amount:4519.94,notes:'minibonus'},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:59.84},{cat:'gas',amount:28.6},{cat:'comunitat',amount:76.6},{cat:'telefon',amount:68.69},{cat:'parking',amount:44},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.05},{cat:'menjar',amount:86},{cat:'bar',amount:109},{cat:'altres',amount:232,notes:'privalia'},{cat:'benzina',amount:20},{cat:'neteja',amount:110}],
+    2:[{cat:'nomina',amount:3847},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:50.86},{cat:'aigua',amount:39.65},{cat:'gas',amount:28.9},{cat:'telefon',amount:66.79},{cat:'cup',amount:60},{cat:'parking',amount:44},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'ibi',amount:125.64},{cat:'asseg_moto',amount:164.68},{cat:'menjar',amount:183},{cat:'bar',amount:231},{cat:'altres',amount:980,notes:'sotana, dentista, regal joana, volley'},{cat:'benzina',amount:29},{cat:'neteja',amount:110}],
+    3:[{cat:'nomina',amount:7683.49,notes:'bonus'},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:42.68},{cat:'gas',amount:8.66},{cat:'comunitat',amount:163},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:80.69},{cat:'ibi',amount:125.64},{cat:'vacances',amount:23,notes:'final barça copa'},{cat:'menjar',amount:206},{cat:'bar',amount:225},{cat:'altres',amount:972,notes:'barça, dentista, bola drac legend 2'},{cat:'benzina',amount:30},{cat:'neteja',amount:110}],
+    4:[{cat:'nomina',amount:4072},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:37.17},{cat:'aigua',amount:40.47},{cat:'gas',amount:19.29},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:136.15,notes:'girona'},{cat:'menjar',amount:97},{cat:'bar',amount:94},{cat:'altres',amount:382,notes:'boda cris'},{cat:'benzina',amount:10},{cat:'neteja',amount:55}],
+    5:[{cat:'nomina',amount:3883.07},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:34.39},{cat:'gas',amount:8.66},{cat:'comunitat',amount:60},{cat:'telefon',amount:81.8},{cat:'cup',amount:60},{cat:'parking',amount:44},{cat:'netflix',amount:105,notes:'google one'},{cat:'fons',amount:50},{cat:'asseg_llar',amount:80.69},{cat:'ibi',amount:125.64},{cat:'vacances',amount:576,notes:'xina corea, palamos'},{cat:'menjar',amount:202},{cat:'bar',amount:152},{cat:'altres',amount:1225,notes:'entrades ruina, volley, farmacia, revisio moto, hisenda'},{cat:'benzina',amount:20},{cat:'neteja',amount:110}],
+    6:[{cat:'nomina',amount:3991},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:37.7},{cat:'aigua',amount:39.82},{cat:'gas',amount:30.27},{cat:'comunitat',amount:156},{cat:'telefon',amount:66.79},{cat:'collegi',amount:68.9},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:174,notes:'vielha'},{cat:'menjar',amount:133},{cat:'bar',amount:199,notes:'cumple kimi'},{cat:'altres',amount:1058,notes:'aspiradora, fisio,volley, calaixera ikea, mangabcn, ferreteria, funda sofa, mudaça'},{cat:'benzina',amount:30},{cat:'neteja',amount:165}],
+    7:[{cat:'nomina',amount:4148},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:58.77},{cat:'gas',amount:4.75},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:70.38},{cat:'vacances',amount:135,notes:'grecia'},{cat:'menjar',amount:132},{cat:'bar',amount:110},{cat:'altres',amount:868,notes:'temu moble, bola drac vol 3, fisio, volley'},{cat:'benzina',amount:19}],
+    8:[{cat:'nomina',amount:3751},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:73.26},{cat:'aigua',amount:43.31},{cat:'gas',amount:12.57},{cat:'telefon',amount:127.29,notes:'roaming grecia/albania'},{cat:'cup',amount:60},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:2028,notes:'grecia, madeira'},{cat:'menjar',amount:14},{cat:'bar',amount:238,notes:'sopar mare joana, hospital mama'},{cat:'altres',amount:100,notes:'farmacia'},{cat:'benzina',amount:9}],
+    9:[{cat:'nomina',amount:3839},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:55.95},{cat:'gas',amount:8.66},{cat:'comunitat',amount:156},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:1493.5,notes:'madeira, 400 pendent grecia, casa rural'},{cat:'gimnàs',amount:267.1,notes:'gimnas + padel'},{cat:'menjar',amount:157},{cat:'bar',amount:56},{cat:'altres',amount:362,notes:'llibres, barça'},{cat:'benzina',amount:30},{cat:'neteja',amount:108.9}],
+    10:[{cat:'nomina',amount:4199},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:42.6},{cat:'aigua',amount:45.63},{cat:'gas',amount:8.66},{cat:'telefon',amount:67.58},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:70.38},{cat:'ibi',amount:125.64},{cat:'vacances',amount:124.6,notes:'vielha'},{cat:'gimnàs',amount:511.8,notes:'50 i 266,8 volley i kenko'},{cat:'menjar',amount:164,notes:'menjar gates'},{cat:'bar',amount:180},{cat:'altres',amount:350,notes:'air fryer, teatre, guants moto,ruina'},{cat:'benzina',amount:30},{cat:'neteja',amount:71.6}],
+    11:[{cat:'nomina',amount:2993.54},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:62.52},{cat:'aigua',amount:9.52},{cat:'gas',amount:8.66},{cat:'cup',amount:60},{cat:'barca',amount:225},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'netflix',amount:55,notes:'amazon'},{cat:'fons',amount:50},{cat:'asseg_llar',amount:70.38},{cat:'ibi',amount:125.64},{cat:'vacances',amount:315,notes:'londres,nuria'},{cat:'gimnàs',amount:120,notes:'kenko'},{cat:'menjar',amount:85},{cat:'bar',amount:84.5},{cat:'altres',amount:837,notes:'teatre joana, regals, farmacia, arreglar rentadora'},{cat:'benzina',amount:30},{cat:'neteja',amount:25}],
+  }
+};
+
+// State
+let state = { year: new Date().getFullYear(), month: new Date().getMonth(), editingId: null, editingCatId: null };
+let categories = [...DEFAULT_CATS];
+let expenses = {}; // year -> month -> [{id, cat, amount, notes}]
+
+// ============================================================
+// SUPABASE CONFIG
+// ============================================================
+const SUPABASE_URL = 'https://nnroezpcwjlwkqylasfb.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ucm9lenBjd2psd2txeWxhc2ZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA4NzYxNjUsImV4cCI6MjA5NjQ1MjE2NX0.fzFNzDfpVg5we7lrNfdle036MoKKEZAE3CoTuU5AUk4';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUser = null;
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+let _loginMode = 'login';
+function showLoginTab(tab) {
+  _loginMode = tab;
+  document.querySelectorAll('.login-tab').forEach((b,i) => b.classList.toggle('active', ['login','register'][i]===tab));
+  document.getElementById('login-name-row').style.display = tab==='register' ? '' : 'none';
+  document.getElementById('login-btn').textContent = tab==='register' ? 'Crear compte' : 'Entrar';
+  document.getElementById('login-error').textContent = '';
+}
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const isReg = _loginMode === 'register';
+  const btn   = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Omple el correu i la contrasenya'; return; }
+  btn.innerHTML = '<span class="login-spinner"></span>' + (isReg ? 'Creant...' : 'Entrant...');
+  btn.disabled = true;
+  try {
+    let res;
+    if (isReg) {
+      const name = document.getElementById('login-name').value.trim() || email.split('@')[0];
+      res = await sb.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
+      if (res.error) throw res.error;
+      if (res.data.user && !res.data.session) {
+        errEl.style.color = 'var(--income)';
+        errEl.textContent = 'Comprova el correu per confirmar el compte';
+        btn.innerHTML = 'Crear compte'; btn.disabled = false; return;
+      }
+      // signUp returned a session — load app directly
+      if (res.data.session) {
+        await onAuthChange(res.data.session);
+        return;
+      }
+    } else {
+      res = await sb.auth.signInWithPassword({ email, password: pass });
+      if (res.error) throw res.error;
+      // Load app directly from the response, don't wait for onAuthStateChange
+      if (res.data.session) {
+        await onAuthChange(res.data.session);
+        return;
+      }
+    }
+    btn.innerHTML = isReg ? 'Crear compte' : 'Entrar'; btn.disabled = false;
+  } catch(e) {
+    errEl.style.color = 'var(--danger)';
+    errEl.textContent = e.message || 'Error desconegut';
+    btn.innerHTML = isReg ? 'Crear compte' : 'Entrar'; btn.disabled = false;
+  }
+}
+
+async function doLogout() {
+  document.getElementById('dataMenu').style.display = 'none';
+  await sb.auth.signOut();
+}
+
+async function doResetPassword() {
+  const email = document.getElementById('login-email').value.trim();
+  if (!email) { document.getElementById('login-error').textContent = 'Posa el teu correu primer'; return; }
+  await sb.auth.resetPasswordForEmail(email);
+  document.getElementById('login-error').style.color = 'var(--income)';
+  document.getElementById('login-error').textContent = 'Correu de recuperació enviat!';
+}
+
+// ── Data layer (Supabase) ─────────────────────────────────────────────────────
+async function loadAll() {
+  if (!currentUser) return;
+  const uid = currentUser.id;
+
+  // Test connection first
+  const { data: testData, error: testErr } = await sb.from('categories').select('count').limit(1);
+  if (testErr) throw new Error('Connexió fallida: ' + testErr.message + ' (codi: ' + testErr.code + ')');
+
+  // Categories
+  const { data: cats, error: catsErr } = await sb.from('categories').select('*').eq('user_id', uid);
+  if (catsErr) throw new Error('categories: ' + catsErr.message + ' (codi: ' + catsErr.code + ')');
+  if (cats && cats.length) {
+    categories = cats.map(r => ({ id: r.cat_id, name: r.name, type: r.type }));
+  } else {
+    categories = [...DEFAULT_CATS];
+    const { error: upsertErr } = await sb.from('categories').upsert(
+      categories.map(c => ({ user_id: uid, cat_id: c.id, name: c.name, type: c.type }))
+    );
+    if (upsertErr) throw new Error('categories upsert: ' + upsertErr.message);
+  }
+
+  // Merchants
+  const { data: merch, error: merchErr } = await sb.from('merchants').select('*').eq('user_id', uid);
+  if (merchErr) throw new Error('merchants: ' + merchErr.message);
+  merchants = {};
+  (merch || []).forEach(r => { merchants[r.merchant_name] = { cat: r.cat, count: r.count }; });
+
+  // Expenses
+  const { data: exps, error: expsErr } = await sb.from('expenses').select('*').eq('user_id', uid);
+  if (expsErr) throw new Error('expenses: ' + expsErr.message);
+  expenses = {};
+  (exps || []).forEach(e => {
+    const yr = parseInt(e.year), mo = parseInt(e.month);
+    if (!expenses[yr]) expenses[yr] = {};
+    if (!expenses[yr][mo]) expenses[yr][mo] = [];
+    expenses[yr][mo].push({ id: e.id, year: yr, month: mo, day: e.day, cat: e.cat, amount: parseFloat(e.amount), notes: e.notes || '', pending: e.pending || false });
+  });
+
+  // Bank formats
+  const { data: fmts, error: fmtsErr } = await sb.from('bank_formats').select('*').eq('user_id', uid);
+  if (fmtsErr) throw new Error('bank_formats: ' + fmtsErr.message);
+  if (fmts && fmts.length) {
+    const custom = fmts.map(r => ({ id: r.fmt_id, name: r.name, blockSize: r.block_size, lines: r.lines, sample: r.sample || '' }));
+    // Store in localStorage as cache for offline display
+    lsSet(LS_FORMATS, custom);
+  }
+}
+
+async function saveCategories() {
+  if (!currentUser) return;
+  const uid = currentUser.id;
+  await Promise.all(categories.map(c => sb.from('categories').upsert({
+    user_id: uid, cat_id: c.id, name: c.name, type: c.type
+  })));
+}
+
+async function saveMerchants() {
+  if (!currentUser) return;
+  const uid = currentUser.id;
+  await Promise.all(Object.entries(merchants).map(([name, data]) =>
+    sb.from('merchants').upsert({ user_id: uid, merchant_name: name, cat: data.cat, count: data.count })
+  ));
+}
+
+async function addExpense(rec) {
+  if (!currentUser) return null;
+  const { data, error } = await sb.from('expenses').insert({
+    user_id: currentUser.id,
+    year: rec.year, month: rec.month, day: rec.day || null,
+    cat: rec.cat, amount: rec.amount, notes: rec.notes || '',
+    pending: rec.pending || false
+  }).select().single();
+  if (error || !data) { console.error(error); return null; }
+  const e = { id: data.id, year: parseInt(data.year), month: parseInt(data.month), day: data.day, cat: data.cat, amount: parseFloat(data.amount), notes: data.notes || '', pending: data.pending || false };
+  const yr = e.year, mo = e.month;
+  if (!expenses[yr]) expenses[yr] = {};
+  if (!expenses[yr][mo]) expenses[yr][mo] = [];
+  expenses[yr][mo].push(e);
+  return e.id;
+}
+
+async function deleteExpense(id, silent) {
+  if (!silent && !confirm('Eliminar aquesta despesa?')) return;
+  await sb.from('expenses').delete().eq('id', id).eq('user_id', currentUser.id);
+  for (const yr of Object.keys(expenses))
+    for (const mo of Object.keys(expenses[yr]))
+      expenses[yr][mo] = expenses[yr][mo].filter(e => e.id !== id);
+  if (!silent) { renderCards(); renderTable(); showToast('Despesa eliminada'); }
+}
+
+async function putCat(cat) {
+  const idx = categories.findIndex(c => c.id === cat.id);
+  if (idx >= 0) categories[idx] = cat; else categories.push(cat);
+  if (currentUser) await sb.from('categories').upsert({ user_id: currentUser.id, cat_id: cat.id, name: cat.name, type: cat.type });
+}
+
+async function delCat(id) {
+  categories = categories.filter(c => c.id !== id);
+  if (currentUser) await sb.from('categories').delete().eq('cat_id', id).eq('user_id', currentUser.id);
+}
+
+async function putMerchant(m) {
+  merchants[m.name] = { cat: m.cat, count: m.count };
+  if (currentUser) await sb.from('merchants').upsert({ user_id: currentUser.id, merchant_name: m.name, cat: m.cat, count: m.count });
+}
+
+async function delMerchant(name) {
+  delete merchants[name];
+  if (currentUser) await sb.from('merchants').delete().eq('merchant_name', name).eq('user_id', currentUser.id);
+}
+
+// localStorage only used for offline cache / formats
+function lsGet(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch(e) { return null; } }
+function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch(e) { return false; } }
+Object.defineProperty(window, 'LS_EXPENSES',  { get: () => 'desp_expenses' });
+Object.defineProperty(window, 'LS_CATS',      { get: () => 'desp_categories' });
+Object.defineProperty(window, 'LS_MERCHANTS', { get: () => 'desp_merchants' });
+Object.defineProperty(window, 'LS_SEEDED',    { get: () => 'desp_seeded' });
+// ── User management (Supabase-based, via auth) ───────────────────────────────
+function getUsers() { return []; } // legacy stub
+function saveUsers() {}
+function getActiveUserId() { return currentUser?.id || ''; }
+function initUserPrefix() {}
+function renderUserSelector() {
+  const sel = document.getElementById('userSelect');
+  if (sel) sel.style.display = 'none'; // hide old selector
+}
+async function switchUser() {}
+
+function openUserModal() {
+  document.getElementById('dataMenu').style.display = 'none';
+  // Show account info
+  const email = currentUser?.email || '';
+  const name  = currentUser?.user_metadata?.full_name || email;
+  alert('Compte: ' + email + '\nNom: ' + name + '\n\nPer canviar d\'usuari, tanca la sessió i entra amb un altre compte.');
+}
+
+async function deleteUser() {}
+
+
+// ── Data menu ────────────────────────────────────────────────────────────────
+function toggleDataMenu() {
+  const m = document.getElementById('dataMenu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('#dataMenuBtn') && !e.target.closest('#dataMenu'))
+    document.getElementById('dataMenu').style.display = 'none';
+});
+
+// ── Export backup ─────────────────────────────────────────────────────────────
+function exportBackup() {
+  document.getElementById('dataMenu').style.display = 'none';
+  const flat = [];
+  for (const yr of Object.values(expenses)) for (const mo of Object.values(yr)) flat.push(...mo);
+  const backup = {
+    version: 1,
+    date: new Date().toISOString(),
+    expenses:   flat,
+    categories: categories,
+    merchants:  merchants
+  };
+  const blob = new Blob([JSON.stringify(backup, null, 2)], {type:'application/json'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  a.download = 'despeses-backup-' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Backup exportat!');
+}
+
+// ── Import backup ─────────────────────────────────────────────────────────────
+let _pendingBackup = null;
+
+async function importBackup(event) {
+  document.getElementById('dataMenu').style.display = 'none';
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const backup = JSON.parse(text);
+    if (!backup.expenses || !backup.categories) throw new Error('Format no vàlid');
+    _pendingBackup = backup;
+    showBackupMergeModal(backup);
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
+  event.target.value = '';
+}
+
+function showBackupMergeModal(backup) {
+  const currentExp  = lsGet(LS_EXPENSES) || [];
+  const backupExp   = backup.expenses || [];
+
+  // Find years only in current (not in backup)
+  const currentYears = new Set(currentExp.map(e => parseInt(e.year)));
+  const backupYears  = new Set(backupExp.map(e => parseInt(e.year)));
+  const onlyInCurrent = [...currentYears].filter(y => !backupYears.has(y)).sort();
+  const onlyInBackup  = [...backupYears].filter(y => !currentYears.has(y)).sort();
+  const inBoth        = [...currentYears].filter(y => backupYears.has(y)).sort();
+
+  // Find duplicates: same year+month+cat+amount+day
+  const dupKey = e => `${e.year}-${e.month}-${e.cat}-${Math.abs(e.amount)}-${e.day||''}`;
+  const currentKeys = new Set(currentExp.map(dupKey));
+  const dups = backupExp.filter(e => currentKeys.has(dupKey(e)));
+
+  let summaryHtml = `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;font-size:12px">`;
+  summaryHtml += `<div style="font-weight:600;margin-bottom:10px;font-size:13px">Backup del ${backup.date?.slice(0,10) || '?'}</div>`;
+  summaryHtml += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+  summaryHtml += `<div><div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">Entrades backup</div><div style="font-size:20px;font-weight:700">${backupExp.length}</div></div>`;
+  summaryHtml += `<div><div style="color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px">Entrades actuals</div><div style="font-size:20px;font-weight:700">${currentExp.length}</div></div>`;
+  if (onlyInCurrent.length) summaryHtml += `<div style="grid-column:1/-1"><span style="color:var(--accent2);font-weight:600">⚠ Anys només a les dades actuals:</span> ${onlyInCurrent.join(', ')} — es conservaran</div>`;
+  if (onlyInBackup.length)  summaryHtml += `<div style="grid-column:1/-1"><span style="color:var(--income);font-weight:600">+ Anys nous al backup:</span> ${onlyInBackup.join(', ')} — s'afegiran</div>`;
+  if (inBoth.length)        summaryHtml += `<div style="grid-column:1/-1"><span style="color:var(--muted)">Anys en comú:</span> ${inBoth.join(', ')}</div>`;
+  summaryHtml += `</div></div>`;
+
+  let dupHtml = '';
+  if (dups.length) {
+    dupHtml = `<div style="font-size:12px;font-weight:600;color:var(--danger);margin-bottom:8px">⚠ ${dups.length} entrades duplicades detectades — marca les que vols ignorar:</div>`;
+    dupHtml += dups.map((e,i) => {
+      const cat = backup.categories?.find(c=>c.id===e.cat) || {name:e.cat};
+      const dateStr = e.day ? `dia ${e.day} ` : '';
+      return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:12px">
+        <input type="checkbox" data-dupidx="${i}" checked style="accent-color:var(--danger);width:14px;height:14px">
+        <div style="flex:1">
+          <span style="font-family:'DM Mono',monospace;font-weight:600">${cat.name}</span>
+          <span style="color:var(--muted);margin-left:8px">${dateStr}${MONTHS[parseInt(e.month)] || ''} ${e.year}</span>
+        </div>
+        <span style="font-family:'DM Mono',monospace;color:var(--danger)">${fmtE(Math.abs(e.amount))}</span>
+      </label>`;
+    }).join('');
+    dupHtml = `<div>${dupHtml}</div>`;
+    // Store dups reference
+    window._backupDups = dups;
+  } else {
+    window._backupDups = [];
+  }
+
+  document.getElementById('backupMergeSummary').innerHTML = summaryHtml;
+  document.getElementById('backupMergeDups').innerHTML = dupHtml;
+  document.getElementById('backupMergeModal').classList.add('open');
+}
+
+async function confirmBackupMerge() {
+  const backup = _pendingBackup;
+  if (!backup) return;
+
+  const currentExp = lsGet(LS_EXPENSES) || [];
+  const backupExp  = backup.expenses || [];
+
+  // Find which dups to skip (those with checkbox checked = skip)
+  const skipDups = new Set();
+  document.querySelectorAll('#backupMergeDups input[type=checkbox]').forEach(cb => {
+    if (cb.checked) skipDups.add(parseInt(cb.dataset.dupidx));
+  });
+
+  const dupKey = e => `${e.year}-${e.month}-${e.cat}-${Math.abs(e.amount)}-${e.day||''}`;
+  const skippedDupKeys = new Set(
+    (window._backupDups || [])
+      .filter((_,i) => skipDups.has(i))
+      .map(dupKey)
+  );
+
+  // Merge: start with current, add backup entries that are not skipped dups
+  const currentKeys = new Set(currentExp.map(dupKey));
+  const toAdd = backupExp.filter(e => !skippedDupKeys.has(dupKey(e)));
+
+  // Re-assign IDs to avoid conflicts
+  let maxId = currentExp.length ? Math.max(...currentExp.map(e=>e.id||0)) : 0;
+  const merged = [...currentExp, ...toAdd.map(e => ({ ...e, id: ++maxId }))];
+
+  // Merge categories (add missing ones from backup)
+  const currentCatIds = new Set((lsGet(LS_CATS)||[]).map(c=>c.id));
+  const backupCats = backup.categories || [];
+  const mergedCats = [...(lsGet(LS_CATS)||[])];
+  backupCats.forEach(c => { if (!currentCatIds.has(c.id)) mergedCats.push(c); });
+
+  // Merge merchants (backup wins on conflict)
+  const mergedMerchants = { ...(lsGet(LS_MERCHANTS)||{}), ...(backup.merchants||{}) };
+
+  // Save merged data to Supabase
+  if (currentUser) {
+    const uid = currentUser.id;
+    // Clear and re-insert expenses
+    await sb.from('expenses').delete().eq('user_id', uid);
+    for (const e of merged) {
+      await sb.from('expenses').insert({ user_id: uid, year: e.year, month: e.month, day: e.day||null, cat: e.cat, amount: e.amount, notes: e.notes||'', pending: e.pending||false });
+    }
+    // Save categories
+    await sb.from('categories').delete().eq('user_id', uid);
+    for (const c of mergedCats) {
+      await sb.from('categories').upsert({ user_id: uid, cat_id: c.id, name: c.name, type: c.type });
+    }
+    // Save merchants
+    await sb.from('merchants').delete().eq('user_id', uid);
+    for (const [name, data] of Object.entries(mergedMerchants)) {
+      await sb.from('merchants').upsert({ user_id: uid, merchant_name: name, cat: data.cat, count: data.count });
+    }
+  }
+
+  await loadAll();
+  closeModal('backupMergeModal');
+  renderMonthTabs();
+  renderCards();
+  renderTable();
+
+  const skipped = skipDups.size;
+  const added = toAdd.length - (backupExp.filter(e => skippedDupKeys.has(dupKey(e))).length);
+  showToast(`Backup combinat: ${added} entrades afegides${skipped ? ', ' + skipped + ' dups ignorades' : '!'}`);
+  _pendingBackup = null;
+}
+
+// ── Reset modal ───────────────────────────────────────────────────────────────
+function openResetModal() {
+  document.getElementById('dataMenu').style.display = 'none';
+  document.getElementById('resetScopeMonthLabel').textContent =
+    MONTHS[state.month] + ' ' + state.year;
+  document.getElementById('resetScopeYearLabel').textContent =
+    'Tot l\'any ' + state.year;
+  document.querySelector('input[name=resetScope][value=month]').checked = true;
+  document.getElementById('resetModal').classList.add('open');
+}
+
+async function confirmReset() {
+  const scope = document.querySelector('input[name=resetScope]:checked').value;
+  if (scope === 'month') {
+    if (!confirm('Esborrar totes les despeses de ' + MONTHS[state.month] + ' ' + state.year + '?')) return;
+    await sb.from('expenses').delete().eq('user_id', currentUser.id).eq('year', state.year).eq('month', state.month);
+    if (expenses[state.year]) expenses[state.year][state.month] = [];
+    showToast(MONTHS[state.month] + ' ' + state.year + ' esborrat');
+  } else if (scope === 'year') {
+    if (!confirm('Esborrar totes les despeses de l\'any ' + state.year + '?')) return;
+    await sb.from('expenses').delete().eq('user_id', currentUser.id).eq('year', state.year);
+    expenses[state.year] = {};
+    showToast('Any ' + state.year + ' esborrat');
+  } else {
+    if (!confirm('Esborrar ABSOLUTAMENT TOT? Aquesta acció no es pot desfer.')) return;
+    await sb.from('expenses').delete().eq('user_id', currentUser.id);
+    await sb.from('categories').delete().eq('user_id', currentUser.id);
+    await sb.from('merchants').delete().eq('user_id', currentUser.id);
+    expenses = {}; categories = [...DEFAULT_CATS]; merchants = {};
+    await saveCategories();
+    showToast('Totes les dades esborrades');
+  }
+  closeModal('resetModal');
+  renderMonthTabs();
+  renderCards();
+  renderTable();
+}
+function getAvailableYears() {
+  const cur = new Date().getFullYear();
+  const fromData = Object.keys(expenses).map(Number);
+  const all = new Set([...fromData, cur]);
+  return [...all].sort((a,b) => a-b);
+}
+
+function refreshYearSelector() {
+  const sel = document.getElementById('yearSelect');
+  const years = getAvailableYears();
+  sel.innerHTML = years.map(y =>
+    `<option value="${y}" ${y===state.year?'selected':''}>${y}</option>`
+  ).join('');
+}
+
+function getCat(id) { return categories.find(c => c.id === id) || { name: id, type: 'variable' }; }
+function fmt(n) { return (n||0).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,'.').replace('.',',').replace(/,(\d+)$/,'.$1').replace(/\.(\d+)$/,',$1'); }
+function fmtE(n) { return fmt(n) + ' €'; }
+
+function getMonthData(year, month) {
+  return (expenses[year] && expenses[year][month]) ? expenses[year][month] : [];
+}
+
+function calcMonth(year, month) {
+  const data = getMonthData(year, month).filter(e => !e.pending);
+  // Income: always positive (abs)
+  const nomina   = data.filter(e => getCat(e.cat).type === 'ingressos').reduce((s,e)=>s+Math.abs(e.amount),0);
+  // Expenses: always positive (abs) for display and totals
+  const totalExp = data.filter(e => getCat(e.cat).type !== 'ingressos').reduce((s,e)=>s+Math.abs(e.amount),0);
+  const fixed    = data.filter(e => getCat(e.cat).type === 'fixa').reduce((s,e)=>s+Math.abs(e.amount),0);
+  const variable = data.filter(e => getCat(e.cat).type === 'variable').reduce((s,e)=>s+Math.abs(e.amount),0);
+  return { nomina, totalExp, fixed, variable, estalvi: nomina - totalExp };
+}
+
+// ============================================================
+// RENDER
+// ============================================================
+function renderMonthTabs() {
+  const el = document.getElementById('monthTabs');
+  el.innerHTML = MONTHS.map((m, i) => `<div class="month-tab ${i===state.month?'active':''}" onclick="selectMonth(${i})">${m.substring(0,3)}</div>`).join('');
+}
+
+function renderCards() {
+  refreshYearSelector();
+  const { nomina, totalExp, fixed, variable, estalvi } = calcMonth(state.year, state.month);
+  document.getElementById('c-nomina').textContent = fmtE(nomina);
+  document.getElementById('c-despeses').textContent = fmtE(totalExp);
+  document.getElementById('c-estalvi').textContent = fmtE(estalvi);
+  document.getElementById('c-fixes').textContent = fmtE(fixed);
+  document.getElementById('c-variable').textContent = `Variable: ${fmtE(variable)}`;
+  const annualNomina = MONTHS.reduce((s,_,i) => s + calcMonth(state.year,i).nomina, 0);
+  document.getElementById('c-nomina-anual').textContent = `Anual: ${fmtE(annualNomina)}`;
+  document.getElementById('c-estalvi').style.color = estalvi >= 0 ? 'var(--accent)' : 'var(--danger)';
+
+}
+
+function renderTable() {
+  const data = getMonthData(state.year, state.month);
+  const tbody = document.getElementById('expenseTable');
+  document.getElementById('mesTitle').textContent = `${MONTHS[state.month]} ${state.year}`;
+
+  const income    = data.filter(e => getCat(e.cat).type === 'ingressos');
+  const nonIncome = data.filter(e => getCat(e.cat).type !== 'ingressos');
+
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">Cap entrada per aquest mes</div></td></tr>`;
+    return;
+  }
+
+  const renderRow = e => {
+    const cat = getCat(e.cat);
+    const isIncome = cat.type === 'ingressos';
+    const typeLabel = isIncome
+      ? `<span style="color:var(--income);font-size:11px;font-weight:600">ingrés</span>`
+      : cat.type === 'fixa'
+        ? `<span class="fixed-tag">fixa</span>`
+        : `<span style="color:var(--muted);font-size:11px">var.</span>`;
+    return `<tr class="${e.pending?'is-pending':''}">
+      <td><span class="cat-badge cat-badge-link" onclick="openDetail('${e.cat}',${state.month},${state.year})" title="Veure detall">${cat.name}</span>${e.pending?'<span class="pending-badge">no compta</span>':''}</td>
+      <td class="amount-cell" style="color:${isIncome?'var(--income)':''}">
+        ${isIncome?'+':''}${fmtE(Math.abs(e.amount))}</td>
+      <td>${typeLabel}</td>
+      <td class="notes-cell" title="${e.notes||''}">${e.notes||'—'}</td>
+      <td><div class="action-cell">
+        <button class="btn ghost sm" onclick="editExpense(${e.id})">Edita</button>
+        <button class="btn danger sm" onclick="deleteExpense(${e.id})">Del</button>
+      </div></td>
+    </tr>`;
+  };
+
+  tbody.innerHTML = [...income, ...nonIncome].map(renderRow).join('');
+}
+
+function renderAnnual() {
+  const grid = document.getElementById('annualGrid');
+  const yr = state.year;
+  document.getElementById('anualTitle').textContent = `Resum Anual ${yr}`;
+
+  // ── Compute annual totals ────────────────────────────────────────────────
+  let annTotNomina = 0, annTotExp = 0, annTotFixed = 0, annTotVariable = 0;
+  for (let m = 0; m < 12; m++) {
+    const c = calcMonth(yr, m);
+    annTotNomina   += c.nomina;
+    annTotExp      += c.totalExp;
+    annTotFixed    += c.fixed;
+    annTotVariable += c.variable;
+  }
+  const annEstalvi = annTotNomina - annTotExp;
+  const savingPct  = annTotNomina > 0 ? ((annEstalvi / annTotNomina) * 100).toFixed(1) : '—';
+
+  // Category totals for the year
+  const catTotals = {};
+  for (let m = 0; m < 12; m++) {
+    getMonthData(yr, m).filter(e => getCat(e.cat).type !== 'ingressos' && !e.pending).forEach(e => {
+      catTotals[e.cat] = (catTotals[e.cat] || 0) + Math.abs(e.amount);
+    });
+  }
+  const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+  const maxCat = sortedCats[0]?.[1] || 1;
+  const BAR_COLORS = ['var(--accent)','var(--accent2)','#f5a060','#f56060','#c060f5','#60f5a0','#f5e060','#60a0f5'];
+
+  // ── KPI cards ────────────────────────────────────────────────────────────
+  const kpiHtml = `<div class="annual-kpis">
+    <div class="annual-kpi" style="border-top:2px solid var(--income)">
+      <div class="annual-kpi-label">Nòmina total</div>
+      <div class="annual-kpi-value" style="color:var(--income)">${fmtE(annTotNomina)}</div>
+      <div class="annual-kpi-sub">Mitjana ${fmtE(annTotNomina/12)}/mes</div>
+    </div>
+    <div class="annual-kpi" style="border-top:2px solid var(--danger)">
+      <div class="annual-kpi-label">Despeses totals</div>
+      <div class="annual-kpi-value" style="color:var(--danger)">${fmtE(annTotExp)}</div>
+      <div class="annual-kpi-sub">Fixes ${fmtE(annTotFixed)} · Var. ${fmtE(annTotVariable)}</div>
+    </div>
+    <div class="annual-kpi" style="border-top:2px solid ${annEstalvi>=0?'var(--accent)':'var(--danger)'}">
+      <div class="annual-kpi-label">Estalvi</div>
+      <div class="annual-kpi-value" style="color:${annEstalvi>=0?'var(--accent)':'var(--danger)'}">${fmtE(annEstalvi)}</div>
+      <div class="annual-kpi-sub">${savingPct}% dels ingressos</div>
+    </div>
+    <div class="annual-kpi" style="border-top:2px solid var(--accent2)">
+      <div class="annual-kpi-label">Despesa mensual avg</div>
+      <div class="annual-kpi-value" style="color:var(--accent2)">${fmtE(annTotExp/12)}</div>
+      <div class="annual-kpi-sub">Fixes ${fmtE(annTotFixed/12)} · Var. ${fmtE(annTotVariable/12)}</div>
+    </div>
+  </div>`;
+
+  // ── Category bars ────────────────────────────────────────────────────────
+  const barsHtml = `<div class="annual-cat-bars">
+    <div class="annual-cat-bars-title">Despesa per categoria</div>
+    ${sortedCats.map(([cid, v], i) => `
+      <div class="bar-row">
+        <div class="bar-label">${getCat(cid).name}</div>
+        <div class="bar-track"><div class="bar-fill" style="width:${(v/maxCat*100).toFixed(1)}%;background:${BAR_COLORS[i%BAR_COLORS.length]}"></div></div>
+        <div class="bar-value">${fmtE(v)}</div>
+      </div>`).join('')}
+  </div>`;
+
+  document.getElementById('annualSummary').innerHTML = kpiHtml;
+  document.getElementById('annualCatBreakdown').innerHTML = sortedCats.length ? barsHtml : '';
+
+  // Build rows: categories that appear + summary
+  const catSet = new Set();
+  for (let m = 0; m < 12; m++) {
+    getMonthData(yr, m).forEach(e => catSet.add(e.cat));
+  }
+
+  let html = '';
+  // Header
+  html += `<div class="ag-head">Categoria</div>`;
+  MONTHS.forEach(m => html += `<div class="ag-head">${m.substring(0,3)}</div>`);
+
+  // Nòmina row
+  html += `<div class="ag-label ag-row-income">Nòmina</div>`;
+  let annualNomina = 0;
+  for (let m = 0; m < 12; m++) {
+    const v = getMonthData(yr,m).filter(e=>getCat(e.cat).type==='ingressos' && !e.pending).reduce((s,e)=>s+Math.abs(e.amount),0);
+    annualNomina += v;
+    html += `<div class="ag-cell ag-row-income">${v?fmtE(v):''}</div>`;
+  }
+
+  // Category rows
+  [...catSet].filter(cid => getCat(cid).type !== 'ingressos').sort((a,b)=>getCat(a).name.localeCompare(getCat(b).name)).forEach(cid => {
+    const cat = getCat(cid);
+    html += `<div class="ag-label" style="font-size:11px">${cat.name}</div>`;
+    for (let m = 0; m < 12; m++) {
+      const items = getMonthData(yr,m).filter(e=>e.cat===cid && !e.pending);
+      const v = items.reduce((s,e)=>s+Math.abs(e.amount),0);
+      const onclick = v ? `openDetail('${cid}',${m},${yr})` : '';
+      const cls = v ? 'ag-cell ag-cell-link' : 'ag-cell';
+      html += `<div class="${cls}" onclick="${onclick}">${v?fmtE(v):''}</div>`;
+    }
+  });
+
+  // Total Fixes
+  html += `<div class="ag-label" style="font-weight:600;color:var(--accent2)">Total Fixes</div>`;
+  for (let m = 0; m < 12; m++) {
+    const v = calcMonth(yr,m).fixed;
+    html += `<div class="ag-cell" style="color:var(--accent2);font-weight:600">${v?fmtE(v):''}</div>`;
+  }
+
+  // Total Variable
+  html += `<div class="ag-label" style="font-weight:600;color:#f5a060">Total Variable</div>`;
+  for (let m = 0; m < 12; m++) {
+    const v = calcMonth(yr,m).variable;
+    html += `<div class="ag-cell" style="color:#f5a060;font-weight:600">${v?fmtE(v):''}</div>`;
+  }
+
+  // Total Despeses
+  html += `<div class="ag-label ag-row-total">Total Despeses</div>`;
+  let annualExp = 0;
+  for (let m = 0; m < 12; m++) {
+    const v = calcMonth(yr,m).totalExp;
+    annualExp += v;
+    html += `<div class="ag-cell ag-row-total">${fmtE(v)}</div>`;
+  }
+
+  // Estalvi
+  html += `<div class="ag-label ag-row-saving" style="color:var(--accent)">Estalvi</div>`;
+  let annualSaving = 0;
+  for (let m = 0; m < 12; m++) {
+    const v = calcMonth(yr,m).estalvi;
+    annualSaving += v;
+    html += `<div class="ag-cell ag-row-saving ${v<0?'ag-neg':''}">${fmtE(v)}</div>`;
+  }
+
+  grid.innerHTML = html;
+}
+
+function renderCharts() {
+  const yr = state.year;
+  // Cat bar
+  const catTotals = {};
+  for (let m = 0; m < 12; m++) {
+    getMonthData(yr,m).filter(e=>getCat(e.cat).type!=='ingressos'&&!e.pending).forEach(e=>{
+      catTotals[e.cat] = (catTotals[e.cat]||0)+Math.abs(e.amount);
+    });
+  }
+  const sorted = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const max = sorted[0]?.[1]||1;
+  const colors = ['var(--accent)','var(--accent2)','#f5a060','#f56060','#c060f5','#60f5a0','#f5e060','#60a0f5'];
+  document.getElementById('catBarChart').innerHTML = sorted.map(([cid,v],i)=>`
+    <div class="bar-row">
+      <div class="bar-label">${getCat(cid).name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/max*100).toFixed(1)}%;background:${colors[i%colors.length]}"></div></div>
+      <div class="bar-value">${fmtE(v)}</div>
+    </div>`).join('');
+
+  // Line charts
+  const monthlyExp = MONTHS.map((_,m)=>calcMonth(yr,m).totalExp);
+  const monthlyNom = MONTHS.map((_,m)=>calcMonth(yr,m).nomina);
+  const monthlyEst = MONTHS.map((_,m)=>calcMonth(yr,m).estalvi);
+  drawLineChart('lineSvg', [{values:monthlyExp,color:'var(--danger)',label:'Despeses'},{values:monthlyNom,color:'var(--income)',label:'Nòmina'}]);
+  drawLineChart('lineSvg2', [{values:monthlyNom,color:'var(--income)',label:'Nòmina'},{values:monthlyExp,color:'var(--danger)',label:'Despeses'}]);
+  // Acumulat
+  let acc = 0;
+  const accEst = monthlyEst.map(v=>{acc+=v;return acc;});
+  drawLineChart('lineSvg3', [{values:accEst,color:'var(--accent)',label:'Estalvi acum.'}]);
+  renderMultiYearChart();
+  renderCompareTable();
+}
+
+function niceMax(v) {
+  if (v <= 0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(v)));
+  return Math.ceil(v / mag) * mag;
+}
+
+function drawLineChart(id, series) {
+  const svg = document.getElementById(id);
+  if(!svg) return;
+  const W=600, H=200, PAD_L=62, PAD_R=16, PAD_T=16, PAD_B=28;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+
+  const allVals = series.flatMap(s=>s.values);
+  const rawMax = Math.max(...allVals);
+  const rawMin = Math.min(0, Math.min(...allVals));
+  const maxV = niceMax(rawMax);
+  const minV = rawMin < 0 ? -niceMax(Math.abs(rawMin)) : 0;
+  const range = maxV - minV || 1;
+
+  const scaleX = i => PAD_L + i * chartW / 11;
+  const scaleY = v => PAD_T + (1 - (v - minV) / range) * chartH;
+
+  let html = '';
+
+  // Grid lines + Y axis labels (5 steps)
+  const steps = 4;
+  for (let i = 0; i <= steps; i++) {
+    const v = minV + (range / steps) * i;
+    const y = scaleY(v);
+    html += `<line x1="${PAD_L}" y1="${y}" x2="${W-PAD_R}" y2="${y}" stroke="#e0e2e7" stroke-width="1"/>`;
+    const label = Math.abs(v) >= 1000 ? (v/1000).toFixed(1)+'k' : Math.round(v).toString();
+    html += `<text x="${PAD_L-6}" y="${y+4}" fill="#6b7280" font-size="9" text-anchor="end" font-family="DM Mono,monospace">${label}</text>`;
+  }
+
+  // Zero line if negative values present
+  if (minV < 0) {
+    const y0 = scaleY(0);
+    html += `<line x1="${PAD_L}" y1="${y0}" x2="${W-PAD_R}" y2="${y0}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+  }
+
+  // X labels
+  MONTHS.forEach((m,i)=>{
+    html += `<text x="${scaleX(i)}" y="${H-6}" fill="#6b7280" font-size="9" text-anchor="middle" font-family="DM Mono,monospace">${m.substring(0,3)}</text>`;
+  });
+
+  // Legend top-right if multiple series
+  if (series.length > 1) {
+    series.forEach((s,i) => {
+      const lx = W - PAD_R - 90;
+      const ly = PAD_T + i * 16;
+      html += `<line x1="${lx}" y1="${ly+5}" x2="${lx+16}" y2="${ly+5}" stroke="${s.color}" stroke-width="2.5"/>`;
+      html += `<text x="${lx+20}" y="${ly+9}" fill="#6b7280" font-size="9" font-family="DM Sans,sans-serif">${s.label||''}</text>`;
+    });
+  }
+
+  // Lines + dots
+  series.forEach(s=>{
+    const pts = s.values.map((v,i)=>`${scaleX(i)},${scaleY(v)}`).join(' ');
+    html += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.5" stroke-linejoin="round"/>`;
+    s.values.forEach((v,i)=>{
+      html += `<circle cx="${scaleX(i)}" cy="${scaleY(v)}" r="3.5" fill="${s.color}"><title>${MONTHS[i]}: ${fmtE(v)}</title></circle>`;
+    });
+  });
+
+  svg.innerHTML = html;
+}
+
+function renderMultiYearChart() {
+  const svg = document.getElementById('multiYearSvg');
+  const legend = document.getElementById('multiYearLegend');
+  if (!svg) return;
+
+  const YEARS = getAvailableYears();
+  const ALL_COLORS = ['#94a3b8','#60a0f5','#f5a060','#c060f5','#2563eb','#16a34a','#f59e0b','#ec4899'];
+  const YEAR_COLORS = YEARS.map((_,i) => ALL_COLORS[i % ALL_COLORS.length]);
+
+  // Per each year, get monthly total expenses
+  const W = 900, H = 230, PAD_L = 55, PAD_R = 20, PAD_T = 20, PAD_B = 35;
+  const chartW = W - PAD_L - PAD_R;
+  const chartH = H - PAD_T - PAD_B;
+
+  const allSeries = YEARS.map((yr, yi) => ({
+    year: yr,
+    color: YEAR_COLORS[yi],
+    values: MONTHS.map((_, m) => calcMonth(yr, m).totalExp)
+  }));
+
+  const allVals = allSeries.flatMap(s => s.values).filter(v => v > 0);
+  const maxV = Math.max(...allVals) || 1;
+  const minV = 0;
+
+  const scaleX = i => PAD_L + i * chartW / 11;
+  const scaleY = v => PAD_T + (1 - (v - minV) / (maxV - minV)) * chartH;
+
+  let html = '';
+
+  // Grid lines + Y labels
+  const steps = 5;
+  for (let i = 0; i <= steps; i++) {
+    const v = (maxV / steps) * i;
+    const y = scaleY(v);
+    html += `<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="#e0e2e7" stroke-width="1"/>`;
+    html += `<text x="${PAD_L - 6}" y="${y + 4}" fill="#6b7280" font-size="10" text-anchor="end" font-family="DM Mono,monospace">${Math.round(v)}</text>`;
+  }
+
+  // X labels
+  MONTHS.forEach((m, i) => {
+    html += `<text x="${scaleX(i)}" y="${H - 6}" fill="#6b7280" font-size="10" text-anchor="middle" font-family="DM Mono,monospace">${m.substring(0,3)}</text>`;
+  });
+
+  // Lines per year
+  allSeries.forEach(s => {
+    const pts = s.values.map((v, i) => `${scaleX(i)},${scaleY(v)}`).join(' ');
+    const isCurrentYear = s.year === state.year;
+    html += `<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="${isCurrentYear ? 3 : 1.8}" stroke-linejoin="round" stroke-dasharray="${isCurrentYear ? 'none' : 'none'}" opacity="${isCurrentYear ? 1 : 0.55}"/>`;
+    s.values.forEach((v, i) => {
+      if (v > 0) {
+        html += `<circle cx="${scaleX(i)}" cy="${scaleY(v)}" r="${isCurrentYear ? 4 : 3}" fill="${s.color}" opacity="${isCurrentYear ? 1 : 0.65}">
+          <title>${s.year} ${MONTHS[i]}: ${fmtE(v)}</title>
+        </circle>`;
+      }
+    });
+  });
+
+  svg.innerHTML = html;
+
+  // Legend
+  legend.innerHTML = allSeries.map(s => `
+    <div style="display:flex;align-items:center;gap:6px;cursor:pointer" onclick="void(0)">
+      <div style="width:24px;height:3px;background:${s.color};border-radius:2px;opacity:${s.year===state.year?1:0.6}"></div>
+      <span style="font-size:12px;font-family:'DM Mono',monospace;color:${s.year===state.year?'var(--accent)':'var(--muted)'};font-weight:${s.year===state.year?600:400}">${s.year}</span>
+    </div>`).join('');
+}
+
+function renderCompareTable() {
+  const table = document.getElementById('compareTable');
+  if (!table) return;
+  const YEARS = getAvailableYears();
+
+  // Gather all category ids across all years
+  const catSet = new Set();
+  YEARS.forEach(yr => {
+    for (let m = 0; m < 12; m++) {
+      getMonthData(yr, m).filter(e => getCat(e.cat).type !== 'ingressos')
+        .forEach(e => catSet.add(e.cat));
+    }
+  });
+  const catIds = [...catSet].sort((a,b) => getCat(a).name.localeCompare(getCat(b).name));
+
+  // Helper: annual total for a cat+year
+  const catYear = (cid, yr) => {
+    let t = 0;
+    for (let m = 0; m < 12; m++)
+      t += getMonthData(yr,m).filter(e=>e.cat===cid).reduce((s,e)=>s+e.amount,0);
+    return t;
+  };
+  const sumYear = (yr, type) => {
+    let t = 0;
+    for (let m = 0; m < 12; m++)
+      t += getMonthData(yr,m).filter(e => !e.pending && (type==='all' ? getCat(e.cat).type!=='ingressos' : getCat(e.cat).type===type)).reduce((s,e)=>s+Math.abs(e.amount),0);
+    return t;
+  };
+  const nomYear = yr => { let t=0; for(let m=0;m<12;m++) t+=calcMonth(yr,m).nomina; return t; };
+  const estYear = yr => nomYear(yr) - sumYear(yr,'all');
+
+  const thStyle = `padding:8px 12px;font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);background:var(--surface2);border:1px solid var(--border);font-family:'DM Mono',monospace;white-space:nowrap`;
+  const tdStyle = (bold, color) => `padding:7px 12px;border:1px solid var(--border);font-family:'DM Mono',monospace;font-size:12px;text-align:right;${bold?'font-weight:600;':''}${color?'color:'+color+';':''}`;
+  const tdLabel = `padding:7px 12px;border:1px solid var(--border);font-size:12px;white-space:nowrap`;
+  const sepStyle = `padding:4px 12px;border:1px solid var(--border);background:var(--surface2);font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);font-weight:600`;
+
+  let html = `<thead><tr>
+    <th style="${thStyle};text-align:left">Categoria</th>
+    <th style="${thStyle};text-align:left">Tipus</th>
+    ${YEARS.map(y=>`<th style="${thStyle}">${y}</th>`).join('')}
+  </tr></thead><tbody>`;
+
+  // Category rows grouped by type
+  ['fixa','variable'].forEach(type => {
+    const label = type === 'fixa' ? 'Despeses fixes' : 'Despeses variables';
+    html += `<tr><td colspan="${2+YEARS.length}" style="${sepStyle}">${label}</td></tr>`;
+    catIds.filter(cid => getCat(cid).type === type).forEach(cid => {
+      const cat = getCat(cid);
+      const vals = YEARS.map(yr => catYear(cid, yr));
+      if (vals.every(v => v === 0)) return;
+      html += `<tr>
+        <td style="${tdLabel}">${cat.name}</td>
+        <td style="${tdLabel};color:var(--muted);font-size:11px">${type}</td>
+        ${vals.map(v => `<td style="${tdStyle(false, v>0?'':'var(--muted)')}">${v?fmtE(v):'—'}</td>`).join('')}
+      </tr>`;
+    });
+  });
+
+  // Summary rows
+  const summaryRows = [
+    { label:'Total Fixes',    color:'var(--accent2)', fn: yr => sumYear(yr,'fixa') },
+    { label:'Total Variable', color:'#f5a060',        fn: yr => sumYear(yr,'variable') },
+    { label:'Total Despeses', color:'var(--danger)',   fn: yr => sumYear(yr,'all') },
+    { label:'Ingressos',      color:'var(--income)',   fn: yr => nomYear(yr) },
+    { label:'Estalvi',        color:'var(--accent)',   fn: yr => estYear(yr) },
+  ];
+
+  html += `<tr><td colspan="${2+YEARS.length}" style="${sepStyle}">Resum anual</td></tr>`;
+  summaryRows.forEach(row => {
+    const vals = YEARS.map(row.fn);
+    html += `<tr style="background:rgba(0,0,0,0.02)">
+      <td style="${tdLabel};font-weight:600">${row.label}</td>
+      <td style="${tdLabel}"></td>
+      ${vals.map(v => `<td style="${tdStyle(true, v<0?'var(--danger)':row.color)}">${fmtE(v)}</td>`).join('')}
+    </tr>`;
+  });
+
+  html += '</tbody>';
+  table.innerHTML = html;
+}
+
+function renderCategories() {
+  const tbody = document.getElementById('catTable');
+  const typeLabel = {fixa:'Fixa',variable:'Variable',ingressos:'Ingressos'};
+  tbody.innerHTML = categories.map(c=>`
+    <tr>
+      <td>${c.name}</td>
+      <td><span class="cat-badge">${typeLabel[c.type]||c.type}</span></td>
+      <td>—</td>
+      <td><div class="action-cell">
+        <button class="btn ghost sm" onclick="editCat('${c.id}')">Edita</button>
+        ${!DEFAULT_CATS.find(d=>d.id===c.id)?`<button class="btn danger sm" onclick="deleteCat('${c.id}')">Del</button>`:''}
+      </div></td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// DETAIL MODAL
+// ============================================================
+function openDetail(catId, month, year) {
+  const cat = getCat(catId);
+  const items = getMonthData(year, month).filter(e => e.cat === catId);
+  // Sort by day, compute total excluding pending
+  const sorted = [...items].sort((a,b) => (a.day||99) - (b.day||99));
+  const total = sorted.filter(e=>!e.pending).reduce((s,e) => s + Math.abs(e.amount), 0);
+  document.getElementById('detail-title').textContent = cat.name;
+  document.getElementById('detail-sub').textContent = `${MONTHS[month]} ${year} · ${items.length} apunt${items.length!==1?'s':''}`;
+  document.getElementById('detail-total').textContent = fmtE(total);
+  document.getElementById('detail-tbody').innerHTML = sorted.length
+    ? sorted.map((e) => {
+        const dayLabel = e.day
+          ? `<span style="font-family:'DM Mono',monospace;font-weight:600">${String(e.day).padStart(2,'0')}</span><span style="color:var(--muted);font-size:10px"> /${String(parseInt(e.month)+1).padStart(2,'0')}</span>`
+          : `<span style="color:var(--muted);font-size:11px">—</span>`;
+        return `<tr>
+          <td style="white-space:nowrap">${dayLabel}</td>
+          <td class="amount-cell" style="color:${getCat(catId).type==='ingressos'?'var(--income)':''}">${getCat(catId).type==='ingressos'?'+':''}${fmtE(Math.abs(e.amount))}</td>
+          <td style="color:var(--muted);font-size:12px">${e.notes||'—'}</td>
+          <td><div class="action-cell">
+            <button class="btn ghost sm" onclick="closeModal('detailModal');editExpense(${e.id})">Edita</button>
+            <button class="btn danger sm" onclick="deleteFromDetail(${e.id},${month},${year},'${catId}')">Esborra</button>
+          </div></td>
+        </tr>`;
+      }).join('')
+    : `<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:24px">Cap apunt</td></tr>`;
+  document.getElementById('detailModal').classList.add('open');
+}
+
+function deleteFromDetail(id, month, year, catId) {
+  if (!confirm('Eliminar aquesta despesa?')) return;
+  const flat = (lsGet(LS_EXPENSES)||[]).filter(e => e.id !== id);
+  lsSet(LS_EXPENSES, flat);
+  for (const yr of Object.keys(expenses))
+    for (const mo of Object.keys(expenses[yr]))
+      expenses[yr][mo] = expenses[yr][mo].filter(e => e.id !== id);
+  renderCards();
+  renderTable();
+  // Refresh detail modal if still has items, else close
+  const remaining = getMonthData(year, month).filter(e => e.cat === catId);
+  if (remaining.length) openDetail(catId, month, year);
+  else closeModal('detailModal');
+  showToast('Despesa eliminada');
+}
+
+// ============================================================
+// QUICK CATEGORY CREATION
+// ============================================================
+let _quickCatTargetId = null; // selector id to update after creating
+
+function handleCatSelect(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  if (sel.value === '__new__') {
+    // Revert to first real option before opening modal
+    sel.value = [...sel.options].find(o => o.value && o.value !== '__new__')?.value || '';
+    openQuickCat(selectId);
+  }
+}
+
+function openQuickCat(targetSelectId, forceType) {
+  _quickCatTargetId = targetSelectId;
+  document.getElementById('qcat-name').value = '';
+  document.getElementById('qcat-error').textContent = '';
+  if (forceType) {
+    document.getElementById('qcat-type').value = forceType;
+  }
+  document.getElementById('quickCatModal').classList.add('open');
+  setTimeout(() => document.getElementById('qcat-name').focus(), 100);
+}
+
+function validateQuickCat() {
+  const name = document.getElementById('qcat-name').value.trim();
+  const exists = categories.find(c => c.name.toLowerCase() === name.toLowerCase());
+  const errEl = document.getElementById('qcat-error');
+  if (exists) {
+    errEl.textContent = 'Ja existeix una categoria amb aquest nom';
+    document.getElementById('qcat-save').disabled = true;
+  } else {
+    errEl.textContent = '';
+    document.getElementById('qcat-save').disabled = false;
+  }
+}
+
+async function saveQuickCat() {
+  const name = document.getElementById('qcat-name').value.trim();
+  const type = document.getElementById('qcat-type').value;
+  if (!name) { showToast('Cal un nom', 'error'); return; }
+  if (categories.find(c => c.name.toLowerCase() === name.toLowerCase())) {
+    showToast('Ja existeix', 'error'); return;
+  }
+  const id = name.toLowerCase().replace(/[^a-z0-9]/g,'_') + '_' + Date.now();
+  const cat = { id, name, type };
+  await putCat(cat);
+  // Update the target selector and select new cat
+  const sel = document.getElementById(_quickCatTargetId);
+  if (sel) {
+    const opt = document.createElement('option');
+    opt.value = id;
+    opt.textContent = name;
+    // Insert before the last option (the "+ Nova" one)
+    const lastOpt = sel.options[sel.options.length - 1];
+    sel.insertBefore(opt, lastOpt);
+    sel.value = id;
+  }
+  closeModal('quickCatModal');
+  showToast('Categoria creada!');
+}
+
+// ============================================================
+// INTERACTIONS
+// ============================================================
+function initAnalysisSelectors() {
+  const years = getAvailableYears();
+  const cur = new Date().getFullYear();
+  const selA = document.getElementById('an-year-a');
+  const selB = document.getElementById('an-year-b');
+  if (!selA || !selB) return;
+  const opts = years.map(y => `<option value="${y}">${y}</option>`).join('');
+  selA.innerHTML = opts;
+  selB.innerHTML = opts;
+  // Default: previous year vs current
+  const idxCur = years.indexOf(cur);
+  selB.value = cur;
+  selA.value = idxCur > 0 ? years[idxCur - 1] : years[0];
+}
+
+function renderAnalysis() {
+  const selA = document.getElementById('an-year-a');
+  const selB = document.getElementById('an-year-b');
+  if (!selA || !selB) return;
+  const yrA = parseInt(selA.value);
+  const yrB = parseInt(selB.value);
+
+  // ── Compute totals for each year ─────────────────────────────────────────
+  const totals = yr => {
+    let nomina=0, exp=0, fixed=0, variable=0;
+    for (let m=0; m<12; m++) {
+      const c = calcMonth(yr, m);
+      nomina += c.nomina; exp += c.totalExp;
+      fixed += c.fixed; variable += c.variable;
+    }
+    return { nomina, exp, fixed, variable, estalvi: nomina - exp };
+  };
+  const tA = totals(yrA), tB = totals(yrB);
+
+  // ── Delta helpers ─────────────────────────────────────────────────────────
+  const delta = (a, b) => b - a;
+  const pct   = (a, b) => a === 0 ? null : ((b - a) / a * 100);
+  const fmtDelta = (a, b, inverse) => {
+    const d = delta(a, b);
+    const p = pct(a, b);
+    if (d === 0) return `<span class="delta-neu">= sense canvi</span>`;
+    const isGood = inverse ? d < 0 : d > 0;
+    const cls = isGood ? 'delta-pos' : 'delta-neg';
+    const sign = d > 0 ? '+' : '';
+    const pctStr = p !== null ? ` (${d>0?'+':''}${p.toFixed(1)}%)` : '';
+    return `<span class="${cls}">${sign}${fmtE(d)}${pctStr}</span>`;
+  };
+
+  // ── Summary cards ─────────────────────────────────────────────────────────
+  const cards = [
+    { label:'Nòmina', vA:tA.nomina, vB:tB.nomina, inverse:false, color:'var(--income)' },
+    { label:'Despeses', vA:tA.exp, vB:tB.exp, inverse:true, color:'var(--danger)' },
+    { label:'Fixes', vA:tA.fixed, vB:tB.fixed, inverse:true, color:'var(--accent2)' },
+    { label:'Variable', vA:tA.variable, vB:tB.variable, inverse:true, color:'#f5a060' },
+    { label:'Estalvi', vA:tA.estalvi, vB:tB.estalvi, inverse:false, color:'var(--accent)' },
+  ];
+  document.getElementById('analysis-summary').style.gridTemplateColumns = '';
+  document.getElementById('analysis-summary').innerHTML = cards.map(c => `
+    <div class="an-card" style="border-left:3px solid ${c.color}">
+      <div style="flex:1;min-width:0">
+        <div class="an-card-label">${c.label}</div>
+        <div class="an-card-value" style="color:${c.color}">${fmtE(c.vB)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${yrA}: ${fmtE(c.vA)}</div>
+      </div>
+      <div class="an-card-delta" style="text-align:right;white-space:nowrap">${fmtDelta(c.vA, c.vB, c.inverse)}</div>
+    </div>`).join('');
+
+  // ── Category comparison table ─────────────────────────────────────────────
+  const catTotYear = (yr, cid) => {
+    let t = 0;
+    for (let m=0; m<12; m++)
+      t += getMonthData(yr,m).filter(e=>e.cat===cid && !e.pending).reduce((s,e)=>s+Math.abs(e.amount),0);
+    return t;
+  };
+
+  // Gather all cats from both years (excl income)
+  const allCats = new Set();
+  for (let m=0; m<12; m++) {
+    getMonthData(yrA,m).forEach(e=>{ if(getCat(e.cat).type!=='ingressos') allCats.add(e.cat); });
+    getMonthData(yrB,m).forEach(e=>{ if(getCat(e.cat).type!=='ingressos') allCats.add(e.cat); });
+  }
+
+  const rows = [...allCats].map(cid => {
+    const vA = catTotYear(yrA, cid);
+    const vB = catTotYear(yrB, cid);
+    return { cid, name:getCat(cid).name, type:getCat(cid).type, vA, vB, diff: vB-vA };
+  }).sort((a,b) => b.vB - a.vB);
+
+  const maxVal = Math.max(...rows.map(r => Math.max(r.vA, r.vB)), 1);
+
+  const tableHtml = `<thead><tr>
+    <th>Categoria</th>
+    <th>Tipus</th>
+    <th>${yrA}</th>
+    <th>${yrB}</th>
+    <th>Diferència</th>
+    <th style="min-width:160px">Evolució</th>
+  </tr></thead><tbody>` +
+  rows.map(r => {
+    const isNew  = r.vA === 0 && r.vB > 0;
+    const isGone = r.vA > 0  && r.vB === 0;
+    const d = r.diff;
+    const isExpense = r.type !== 'ingressos';
+    // For expenses: increase is bad (red), decrease is good (green)
+    const deltaClass = d === 0 ? 'delta-neu' : (isExpense ? (d>0?'delta-neg':'delta-pos') : (d>0?'delta-pos':'delta-neg'));
+    const sign = d > 0 ? '+' : '';
+    const pctStr = r.vA > 0 ? ` (${sign}${(d/r.vA*100).toFixed(1)}%)` : '';
+    const barA = `<div class="an-bar" style="width:${(r.vA/maxVal*100).toFixed(1)}%;background:var(--muted);opacity:0.4"></div>`;
+    const barB = `<div class="an-bar" style="width:${(r.vB/maxVal*100).toFixed(1)}%;background:var(--accent)"></div>`;
+    return `<tr>
+      <td><b>${r.name}</b>${isNew?'<span class="an-new-badge">NOU</span>':''}${isGone?'<span class="an-gone-badge">DESAPAREGUT</span>':''}</td>
+      <td style="color:var(--muted);font-size:11px">${r.type}</td>
+      <td style="font-family:'DM Mono',monospace;text-align:right;color:var(--muted)">${r.vA?fmtE(r.vA):'—'}</td>
+      <td style="font-family:'DM Mono',monospace;text-align:right;font-weight:600">${r.vB?fmtE(r.vB):'—'}</td>
+      <td style="font-family:'DM Mono',monospace;text-align:right"><span class="${deltaClass}">${d!==0?sign+fmtE(Math.abs(d))+pctStr:'='}</span></td>
+      <td><div style="display:flex;flex-direction:column;gap:2px">${barA}${barB}</div></td>
+    </tr>`;
+  }).join('') + '</tbody>';
+
+  document.getElementById('analysis-table').innerHTML = tableHtml;
+}
+
+function showTab(tab) {
+  document.querySelectorAll('.app').forEach(a=>a.classList.remove('visible'));
+  document.getElementById('tab-'+tab).classList.add('visible');
+  document.querySelectorAll('nav button').forEach((b,i)=>{
+    b.classList.toggle('active', ['mes','anual','grafics','categories','merchants','analisi'][i]===tab);
+  });
+  if(tab==='anual') renderAnnual();
+  else if(tab==='grafics') renderCharts();
+  else if(tab==='categories') renderCategories();
+  else if(tab==='merchants') renderMerchants();
+  else if(tab==='analisi') renderAnalysis();
+}
+
+function selectMonth(m) {
+  state.month = m;
+  renderMonthTabs();
+  renderCards();
+  renderTable();
+}
+
+function onYearChange() {
+  state.year = parseInt(document.getElementById('yearSelect').value);
+  renderMonthTabs();
+  renderCards();
+  renderTable();
+  const tabs = ['mes','anual','grafics','categories','merchants','analisi'];
+  const activeBtn = document.querySelector('nav button.active');
+  const idx = [...document.querySelectorAll('nav button')].indexOf(activeBtn);
+  const tab = tabs[idx];
+  if (tab === 'anual') renderAnnual();
+  else if (tab === 'grafics') renderCharts();
+  else if (tab === 'merchants') renderMerchants();
+}
+
+// Expense modal
+function openAddModal() {
+  state.editingId = null;
+  _expenseSign = -1;
+  document.getElementById('modalTitle').textContent = 'Afegir despesa';
+  populateExpenseForm();
+  setSign(-1);
+  document.getElementById('expenseModal').classList.add('open');
+}
+
+function editExpense(id) {
+  state.editingId = id;
+  document.getElementById('modalTitle').textContent = 'Editar despesa';
+  let found;
+  for (const yr of Object.values(expenses)) {
+    for (const mo of Object.values(yr)) {
+      found = mo.find(e=>e.id===id);
+      if(found) break;
+    }
+    if(found) break;
+  }
+  populateExpenseForm(found);
+  const sign = found && found.amount > 0 ? 1 : -1;
+  _expenseSign = sign;
+  setSign(sign);
+  if(found) document.getElementById('f-amount').value = Math.abs(found.amount);
+  document.getElementById('expenseModal').classList.add('open');
+}
+
+function populateExpenseForm(exp) {
+  const catSel = document.getElementById('f-cat');
+  const showAll = exp && exp.amount > 0;
+  catSel.innerHTML = categories.filter(c => showAll ? true : c.type!=='ingressos').map(c=>`<option value="${c.id}">${c.name}</option>`).join('') +
+    '<option value="__new__" style="color:var(--accent);font-weight:600">+ Nova categoria...</option>';
+  if(exp) catSel.value = exp.cat;
+  // onchange set via HTML attribute
+  document.getElementById('f-amount').value = exp ? Math.abs(exp.amount) : '';
+  document.getElementById('f-notes').value = exp ? (exp.notes||'') : '';
+  document.getElementById('f-day').value = exp ? (exp.day || '') : '';
+  document.getElementById('f-pending').checked = exp ? !!exp.pending : false;
+  const mSel = document.getElementById('f-month');
+  mSel.innerHTML = MONTHS.map((m,i)=>`<option value="${i}" ${i===state.month?'selected':''}>${m}</option>`).join('');
+  if(exp) mSel.value = exp.month;
+  const ySel = document.getElementById('f-year');
+  const expYears = getAvailableYears();
+  const curY = new Date().getFullYear();
+  if (!expYears.includes(curY+1)) expYears.push(curY+1);
+  ySel.innerHTML = expYears.map(y=>`<option value="${y}" ${y===state.year?'selected':''}>${y}</option>`).join('');
+  if(exp) ySel.value = exp.year;
+}
+
+let _expenseSign = -1; // -1 = despesa, +1 = ingrés
+
+function setSign(s) {
+  _expenseSign = s;
+  document.getElementById('sign-neg').style.background = s === -1 ? 'var(--danger)' : 'var(--surface2)';
+  document.getElementById('sign-neg').style.color      = s === -1 ? 'white' : 'var(--muted)';
+  document.getElementById('sign-pos').style.background = s ===  1 ? 'var(--income)' : 'var(--surface2)';
+  document.getElementById('sign-pos').style.color      = s ===  1 ? 'white' : 'var(--muted)';
+  // Show income categories when positive
+  const catSel = document.getElementById('f-cat');
+  const prev = catSel.value;
+  catSel.innerHTML = categories
+    .filter(c => s === 1 ? true : c.type !== 'ingressos')
+    .map(c => `<option value="${c.id}">${c.name}</option>`).join('') +
+    '<option value="__new__" style="color:var(--accent);font-weight:600">+ Nova categoria...</option>';
+  if ([...catSel.options].find(o => o.value === prev && o.value !== '__new__')) catSel.value = prev;
+  else if (s === 1) { const nom = categories.find(c=>c.id==='nomina'); if(nom) catSel.value = 'nomina'; }
+}
+
+async function saveExpense() {
+  const cat = document.getElementById('f-cat').value;
+  if (cat === '__new__' || !cat) { showToast('Selecciona una categoria', 'error'); return; }
+  const amount = parseFloat(document.getElementById('f-amount').value);
+  const notes = document.getElementById('f-notes').value.trim();
+  const month = parseInt(document.getElementById('f-month').value);
+  const year = parseInt(document.getElementById('f-year').value);
+  const dayVal = document.getElementById('f-day').value.trim();
+  const day = dayVal ? parseInt(dayVal) : null;
+  const signedAmount = Math.abs(amount); // store always positive; category type determines income vs expense
+  if(!cat || isNaN(amount) || amount<=0) { showToast('Omple tots els camps','error'); return; }
+
+  // Duplicate check (skip when editing)
+  if (!state.editingId) {
+    const existing = (getMonthData(year, month) || []).find(e =>
+      e.cat === cat &&
+      Math.abs(Math.abs(e.amount) - Math.abs(amount)) < 0.01 &&
+      (day === null || e.day === day || e.day == null)
+    );
+    if (existing) {
+      const dayStr = existing.day ? ` (dia ${existing.day})` : '';
+      if (!confirm(`Ja existeix una despesa igual: ${getCat(cat).name} ${fmtE(amount)}${dayStr}.
+
+Vols afegir-la igualment?`)) return;
+    }
+  }
+
+  if(state.editingId) await deleteExpense(state.editingId, true);
+  const pending = document.getElementById('f-pending').checked;
+  await addExpense({ year, month, day, cat, amount: signedAmount, notes, pending });
+  closeModal('expenseModal');
+  renderCards();
+  renderTable();
+  showToast(state.editingId ? 'Despesa actualitzada' : 'Despesa afegida');
+}
+
+async function deleteExpense(id, silent) {
+  if(!silent && !confirm('Eliminar aquesta despesa?')) return;
+  const flat = (lsGet(LS_EXPENSES)||[]).filter(e=>e.id!==id);
+  lsSet(LS_EXPENSES, flat);
+  for(const yr of Object.keys(expenses))
+    for(const mo of Object.keys(expenses[yr]))
+      expenses[yr][mo] = expenses[yr][mo].filter(e=>e.id!==id);
+  if(!silent){ renderCards(); renderTable(); showToast('Despesa eliminada'); }
+}
+
+// Category modal
+function openCatModal() {
+  state.editingCatId = null;
+  document.getElementById('catModalTitle').textContent = 'Nova categoria';
+  document.getElementById('cf-name').value = '';
+  document.getElementById('cf-type').value = 'variable';
+  document.getElementById('catModal').classList.add('open');
+}
+
+function editCat(id) {
+  const c = categories.find(x=>x.id===id);
+  if(!c) return;
+  state.editingCatId = id;
+  document.getElementById('catModalTitle').textContent = 'Editar categoria';
+  document.getElementById('cf-name').value = c.name;
+  document.getElementById('cf-type').value = c.type;
+  document.getElementById('catModal').classList.add('open');
+}
+
+async function saveCat() {
+  const name = document.getElementById('cf-name').value.trim();
+  const type = document.getElementById('cf-type').value;
+  if(!name) { showToast('Cal un nom','error'); return; }
+  if(state.editingCatId) {
+    const idx = categories.findIndex(c=>c.id===state.editingCatId);
+    if(idx>=0) { categories[idx].name=name; categories[idx].type=type; await putCat(categories[idx]); }
+  } else {
+    const id = name.toLowerCase().replace(/[^a-z0-9]/g,'_')+'_'+Date.now();
+    await putCat({id, name, type});
+  }
+  closeModal('catModal');
+  renderCategories();
+  showToast('Categoria guardada');
+}
+
+async function deleteCat(id) {
+  if(!confirm('Eliminar categoria?')) return;
+  await delCat(id);
+  renderCategories();
+  showToast('Categoria eliminada');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = type==='error'?'var(--danger)':'var(--accent)';
+  t.style.color = 'white';
+  t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// Close modals on bg click
+document.querySelectorAll('.modal-bg').forEach(bg=>{
+  bg.addEventListener('click', e=>{ if(e.target===bg) bg.classList.remove('open'); });
+});
+
+
+// ============================================================
+// IMPORT EXTRACTE
+// ============================================================
+// ── Custom bank formats ───────────────────────────────────────────────────────
+let _fmtSampleLines = [];  // {text, type}[] for configurator
+let _editingFmtId   = null;
+
+function getBankFormats() { return [...BUILTIN_FORMATS, ...(lsGet(LS_FORMATS) || [])]; }
+function saveBankFormats(f) { lsSet(LS_FORMATS, f.filter(x => !x.builtin)); }
+
+function refreshFormatSelector() {
+  const sel = document.getElementById('import-format');
+  if (!sel) return;
+  const fmts = getBankFormats();
+  sel.innerHTML =
+    fmts.map(f => `<option value="${f.id}">${f.name}${f.builtin?' (integrat)':''}</option>`).join('') +
+    '<option value="__manage__">⚙ Gestionar formats...</option>';
+}
+
+function onFormatChange() {
+  const v = document.getElementById('import-format').value;
+  if (v === '__manage__') {
+    document.getElementById('import-format').value = 'auto';
+    openFormatManager();
+  }
+}
+
+function openFormatConfig(editId) {
+  _editingFmtId = editId || null;
+  _fmtSampleLines = [];
+  const fmt = editId ? getBankFormats().find(f => f.id === editId) : null;
+  document.getElementById('fmtModalTitle').textContent = fmt ? 'Editar format' : 'Nou format de banc';
+  document.getElementById('fmt-name').value = fmt ? fmt.name : '';
+  document.getElementById('fmt-sample').value = fmt ? fmt.sample || '' : '';
+  document.getElementById('fmtLineAssign').style.display = 'none';
+  if (fmt && fmt.sample) {
+    document.getElementById('fmt-sample').dispatchEvent(new Event('input'));
+    // Restore saved assignments
+    setTimeout(() => {
+      _fmtSampleLines = fmt.lines ? fmt.lines.map((t, i) => ({
+        text: _fmtSampleLines[i]?.text || '',
+        type: t
+      })) : _fmtSampleLines;
+      if (fmt.lines) {
+        fmt.lines.forEach((t, i) => {
+          if (_fmtSampleLines[i]) _fmtSampleLines[i].type = t;
+        });
+        renderFmtLines();
+      }
+    }, 50);
+  }
+  document.getElementById('formatModal').classList.add('open');
+}
+
+function parseFmtSample() {
+  const text = document.getElementById('fmt-sample').value;
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (!lines.length) {
+    document.getElementById('fmtLineAssign').style.display = 'none';
+    return;
+  }
+  // Preserve existing type assignments where lines match
+  const prev = {};
+  _fmtSampleLines.forEach(l => { prev[l.text] = l.type; });
+  _fmtSampleLines = lines.map(t => ({ text: t, type: prev[t] || autoGuessType(t) }));
+  document.getElementById('fmtLineAssign').style.display = 'block';
+  renderFmtLines();
+}
+
+function autoGuessType(line) {
+  if (isAmountLine(line)) return 'amount';
+  if (isDateLine(line)) return 'date';
+  return 'name';
+}
+
+const FMT_CYCLE = ['name', 'date', 'amount', 'skip'];
+const FMT_LABELS = { name:'NOM', date:'DATA', amount:'IMPORT', skip:'IGNORAR' };
+const FMT_CLASSES = { name:'sel-name', date:'sel-date', amount:'sel-amount', skip:'sel-skip' };
+const FMT_PILL_CLASSES = { name:'fmt-pill-name', date:'fmt-pill-date', amount:'fmt-pill-amount', skip:'fmt-pill-skip' };
+
+function renderFmtLines() {
+  document.getElementById('fmtLineList').innerHTML = _fmtSampleLines.map((l, i) => `
+    <div class="fmt-line ${FMT_CLASSES[l.type]}" onclick="cycleFmtLine(${i})">
+      <span class="fmt-pill ${FMT_PILL_CLASSES[l.type]}">${FMT_LABELS[l.type]}</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.text}</span>
+    </div>`).join('');
+  validateFmt();
+}
+
+function cycleFmtLine(i) {
+  const cur = _fmtSampleLines[i].type;
+  _fmtSampleLines[i].type = FMT_CYCLE[(FMT_CYCLE.indexOf(cur) + 1) % FMT_CYCLE.length];
+  renderFmtLines();
+}
+
+function validateFmt() {
+  const types = _fmtSampleLines.map(l => l.type);
+  const hasName   = types.includes('name');
+  const hasAmount = types.includes('amount');
+  const valEl = document.getElementById('fmtValidation');
+  if (!hasName || !hasAmount) {
+    valEl.innerHTML = '<span style="color:var(--danger)">⚠ Cal marcar NOM i IMPORT</span>';
+  } else {
+    const blockSize = _fmtSampleLines.length;
+    valEl.innerHTML = `<span style="color:var(--income)">✓ Format vàlid — bloc de ${blockSize} línia${blockSize>1?'s':''}</span>`;
+  }
+}
+
+async function saveFormat() {
+  const name = document.getElementById('fmt-name').value.trim();
+  if (!name) { showToast('Cal un nom pel format', 'error'); return; }
+  const types = _fmtSampleLines.map(l => l.type);
+  if (!types.includes('name') || !types.includes('amount')) {
+    showToast('Cal marcar NOM i IMPORT', 'error'); return;
+  }
+  const fmts = getBankFormats();
+  const id = _editingFmtId || 'fmt_' + Date.now();
+  const fmt = {
+    id, name,
+    sample: document.getElementById('fmt-sample').value,
+    lines: types,           // pattern: array of 'name'|'date'|'amount'|'skip'
+    blockSize: types.length
+  };
+  const idx = fmts.findIndex(f => f.id === id);
+  if (idx >= 0) fmts[idx] = fmt; else fmts.push(fmt);
+  saveBankFormats(fmts);
+  if (currentUser) await sb.from('bank_formats').upsert({ user_id: currentUser.id, fmt_id: id, name: fmt.name, block_size: fmt.blockSize, lines: fmt.lines, sample: fmt.sample||'' });
+  refreshFormatSelector();
+  closeModal('formatModal');
+  // Auto-select the saved format
+  document.getElementById('import-format').value = id;
+  if (!document.getElementById('import-format').value) document.getElementById('import-format').selectedIndex = 0;
+  showToast('Format guardat!');
+}
+
+function openFormatManager() {
+  // For now open a simple list in formatModal reused
+  const fmts = getBankFormats();
+  if (!fmts.length) { openFormatConfig(); return; }
+  _editingFmtId = null;
+  document.getElementById('fmtModalTitle').textContent = 'Formats guardats';
+  document.getElementById('fmt-name').value = '';
+  document.getElementById('fmt-sample').value = '';
+  document.getElementById('fmtLineAssign').style.display = 'none';
+  // Repurpose the line list area to show saved formats
+  document.getElementById('fmtLineAssign').style.display = 'block';
+  document.getElementById('fmtLineList').innerHTML = fmts.map(f => `
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px">
+      <div style="flex:1;font-size:13px;font-weight:600">${f.name}
+        ${f.builtin ? '<span style="font-size:10px;color:var(--muted);font-weight:400;margin-left:4px">integrat</span>' : ''}
+      </div>
+      <div style="font-size:11px;color:var(--muted)">${f.blockSize} línies/bloc</div>
+      ${!f.builtin ? `<button class="btn ghost sm" onclick="openFormatConfig('${f.id}')">Editar</button>
+      <button class="btn danger sm" onclick="deleteFormat('${f.id}')">Del</button>` : ''}
+    </div>`).join('');
+  document.getElementById('fmtValidation').innerHTML = '';
+  document.getElementById('formatModal').classList.add('open');
+}
+
+async function deleteFormat(id) {
+  if (!confirm('Eliminar aquest format?')) return;
+  const fmts = getBankFormats().filter(f => f.id !== id && !f.builtin);
+  saveBankFormats(fmts);
+  if (currentUser) await sb.from('bank_formats').delete().eq('fmt_id', id).eq('user_id', currentUser.id);
+  refreshFormatSelector();
+  openFormatManager();
+}
+
+// ── Custom format parser ──────────────────────────────────────────────────────
+function parseWithCustomFormat(text, fmt) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const rows = [];
+  const bs = fmt.blockSize;
+  const pattern = fmt.lines; // ['name','date','amount','skip',...]
+  const amtIdx  = pattern.indexOf('amount');
+  const nameIdx = pattern.indexOf('name');
+  const dateIdx = pattern.indexOf('date');
+  if (amtIdx < 0 || nameIdx < 0) return rows;
+
+  let i = 0;
+  while (i < lines.length) {
+    // Try to start a block here — validate that the amount position matches
+    if (i + bs > lines.length) break;
+    const block = lines.slice(i, i + bs);
+    const amtLine  = block[amtIdx];
+    const nameLine = block[nameIdx];
+    const dateLine = dateIdx >= 0 ? block[dateIdx] : '';
+    const amt = parseAmount(amtLine);
+    // Only accept the block if the amount line actually parses
+    if (amt === null || amt === 0) {
+      i++; // shift by 1 and retry
+      continue;
+    }
+    rows.push({
+      merchant:   nameLine.toUpperCase().trim(),
+      amount:     amt,
+      date:       dateLine,
+      day:        dateLine ? parseDay(dateLine) : null,
+      isPositive: amt > 0
+    });
+    i += bs; // advance a full block
+  }
+  return rows;
+}
+
+let importedRows = [];
+let importMonth = 0;
+let importYear = new Date().getFullYear();
+
+function openImportModal() {
+  refreshFormatSelector();
+  const mSel = document.getElementById('import-month');
+  const ySel = document.getElementById('import-year');
+  mSel.innerHTML = MONTHS.map((m,i) => `<option value="${i}" ${i===state.month?'selected':''}>${m}</option>`).join('');
+  const impYears = getAvailableYears();
+  const impCurY = new Date().getFullYear();
+  if (!impYears.includes(impCurY+1)) impYears.push(impCurY+1);
+  ySel.innerHTML = impYears.map(y => `<option value="${y}" ${y===state.year?'selected':''}>${y}</option>`).join('');
+  document.getElementById('importText').value = '';
+  document.getElementById('importModal').classList.add('open');
+}
+
+function isDateLine(s) {
+  return /^\d{1,2}\s+de\s+\w+/i.test(s) ||   // "06 de junio"
+         /^\d{2}\/\d{2}(\/\d{2,4})?$/.test(s) || // "03/06" or "03/06/2025"
+         /^\d{4}-\d{2}-\d{2}$/.test(s);          // "2025-06-03"
+}
+function isAmountLine(s) { return /^-?[\d.,]+\s*€/.test(s); }
+function parseDay(s) {
+  const m = s.match(/^(\d{1,2})\s+de/i) || s.match(/^(\d{2})\//);
+  return m ? parseInt(m[1]) : null;
+}
+function parseAmount(s) {
+  const m = s.match(/(-?[\d.,]+)\s*€/);
+  if (!m) return null;
+  return parseFloat(m[1].replace(/\./g,'').replace(',','.'));
+}
+
+function parseExtract(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const rows = [];
+  let i = 0;
+
+  // Detect format B: starts with date line (dd/mm pattern)
+  // Format A: merchant / date / amount [/ ...]
+  // Format B: date / merchant / amount / balance
+  const formatB = lines.length >= 2 && isDateLine(lines[0]) && !isDateLine(lines[1]);
+
+  while (i < lines.length) {
+    if (formatB) {
+      // Format B: DATE / MERCHANT / AMOUNT / BALANCE(skip)
+      if (!isDateLine(lines[i])) { i++; continue; }
+      const dateLine = lines[i];
+      const merchantLine = lines[i+1] || '';
+      const amtLine = lines[i+2] || '';
+      if (!isAmountLine(amtLine)) { i++; continue; }
+      const amt = parseAmount(amtLine);
+      if (amt !== null && amt !== 0) {
+        rows.push({
+          merchant: merchantLine.toUpperCase().trim(),
+          amount: amt,          // keep sign: positive = ingrés
+          date: dateLine,
+          day: parseDay(dateLine),
+          isPositive: amt > 0
+        });
+      }
+      // Skip balance line if present
+      const nextLine = lines[i+3] || '';
+      i += isAmountLine(nextLine) ? 4 : 3;
+    } else {
+      // Format A: MERCHANT / DATE / AMOUNT
+      const nameLine = lines[i];
+      const dateLine = lines[i+1] || '';
+      const amtLine  = lines[i+2] || '';
+      if (!isDateLine(dateLine) || !isAmountLine(amtLine)) { i++; continue; }
+      const amt = parseAmount(amtLine);
+      if (amt !== null && amt !== 0) {
+        rows.push({
+          merchant: nameLine.toUpperCase().trim(),
+          amount: amt,
+          date: dateLine,
+          day: parseDay(dateLine),
+          isPositive: amt > 0
+        });
+      }
+      i += 3;
+    }
+  }
+  return rows;
+}
+
+function analyzeImport() {
+  const text = document.getElementById('importText').value.trim();
+  if (!text) { showToast('Enganxa primer el text', 'error'); return; }
+
+  importMonth = parseInt(document.getElementById('import-month').value);
+  importYear  = parseInt(document.getElementById('import-year').value);
+
+  const fmtId = document.getElementById('import-format')?.value;
+  const fmt = getBankFormats().find(f => f.id === fmtId);
+  let rows;
+  if (!fmt) { showToast('Selecciona un format', 'error'); return; }
+  rows = parseWithCustomFormat(text, fmt);
+  if (!rows.length) { showToast("No s'han detectat despeses. Comprova el format.", "error"); return; }
+
+  // Assign category: known merchant -> its cat, else default variable cat
+  const defaultCat = categories.find(c => c.id === 'altres')?.id || categories.find(c => c.type === 'variable')?.id || '';
+  const nominaCat = categories.find(c=>c.id==='nomina')?.id || 'nomina';
+  importedRows = rows.map(r => {
+    const known = merchants[r.merchant];
+    const isSkip = known && known.cat === '__skip__';
+    let cat;
+    if (r.isPositive) cat = known && !isSkip ? known.cat : nominaCat;
+    else cat = known && !isSkip ? known.cat : defaultCat;
+    return {
+      merchant:   r.merchant,
+      amount:     r.amount,
+      date:       r.date,
+      day:        r.day || null,
+      cat,
+      notes:      '',
+      isPositive: r.isPositive,
+      wasKnown:   !!known && !isSkip,
+      wasSkip:    isSkip
+    };
+  });
+
+  closeModal('importModal');
+  openReviewModal();
+}
+
+function toggleSkipRow(i, skip) {
+  const item = document.getElementById('review-'+i);
+  const selects = document.getElementById('rv-selects-'+i);
+  if (item) item.style.opacity = skip ? '0.45' : '1';
+  if (selects) selects.style.display = skip ? 'none' : '';
+  importedRows[i]._skipOverride = skip;
+}
+
+function openReviewModal() {
+  const catOptions = categories.filter(c=>c.type!=='ingressos')
+    .map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+  document.getElementById('reviewList').innerHTML = importedRows.map((r,i) => {
+    const skipChecked = r.wasSkip ? 'checked' : '';
+    const itemStyle = r.wasSkip ? 'opacity:0.45' : '';
+    return `
+    <div class="review-item" id="review-${i}" style="${itemStyle}">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div>
+          <div class="review-merchant">
+            ${r.merchant}
+            ${r.wasKnown ? '<span class="known-badge">★ conegut</span>' : ''}
+            ${r.wasSkip  ? '<span style="color:var(--muted);font-size:10px;font-weight:600;margin-left:6px">⊘ ignorar</span>' : ''}
+          </div>
+          <div class="review-meta">${r.day ? r.day + (r.date ? ' ' + r.date.replace(/^\d+\s+/, '') : '') + ' · ' : ''}${fmtE(Math.abs(r.amount))}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;white-space:nowrap">
+          <div class="review-amount" style="color:${r.isPositive?'var(--income)':'var(--danger)'}">${r.isPositive?'+':'-'}${fmtE(Math.abs(r.amount))}</div>
+          <label style="display:flex;align-items:center;gap:4px;font-size:11px;color:var(--muted);cursor:pointer">
+            <input type="checkbox" id="rv-skip-${i}" ${skipChecked} onchange="toggleSkipRow(${i},this.checked)" style="accent-color:var(--danger);width:14px;height:14px">
+            No importar
+          </label>
+        </div>
+      </div>
+      <div class="review-selects" id="rv-selects-${i}" style="${r.wasSkip?'display:none':''}">
+        <select id="rv-cat-${i}" style="flex:2" onchange="handleCatSelect('rv-cat-${i}')">
+          ${categories.filter(c => r.isPositive ? true : c.type!=='ingressos').map(c =>
+            `<option value="${c.id}" ${c.id===r.cat?'selected':''}>${c.name}</option>`
+          ).join('')}
+          <option value="__new__" style="color:var(--accent);font-weight:600">+ Nova categoria...</option>
+        </select>
+        <input type="text" id="rv-notes-${i}" value="${r.notes || r.merchant}" placeholder="Notes..." style="flex:3">
+      </div>
+    </div>`;
+  }).join('');
+
+  // Reset result panel in case it was shown from a previous import
+  document.getElementById('importResult').style.display = 'none';
+  document.getElementById('reviewList').style.display = 'flex';
+  document.getElementById('confirmImportBtn').style.display = '';
+  const closeBtn = document.querySelector('#importActions .btn.ghost');
+  if (closeBtn) closeBtn.textContent = 'Cancel·lar';
+  document.getElementById('reviewModal').classList.add('open');
+}
+
+async function confirmImport() {
+  let saved = 0, skipped = 0;
+  for (let i = 0; i < importedRows.length; i++) {
+    const merchant = importedRows[i].merchant;
+    const amount   = importedRows[i].amount;
+    const day      = importedRows[i].day || null;
+    // Check skip checkbox
+    const skipEl = document.getElementById(`rv-skip-${i}`);
+    const doSkip = skipEl ? skipEl.checked : (importedRows[i]._skipOverride || importedRows[i].wasSkip);
+    if (doSkip) {
+      // Save merchant as __skip__ so future imports ignore it automatically
+      merchants[merchant] = { cat: '__skip__', count: (merchants[merchant]?.count || 0) + 1 };
+      skipped++;
+      continue;
+    }
+    const cat   = document.getElementById(`rv-cat-${i}`).value;
+    const notes = document.getElementById(`rv-notes-${i}`).value.trim();
+    // Duplicate check
+    const dup = (getMonthData(importYear, importMonth)||[]).find(e =>
+      e.cat === cat && Math.abs(Math.abs(e.amount) - Math.abs(amount)) < 0.01 && (day == null || e.day === day)
+    );
+    if (dup) { skipped++; continue; }
+    await addExpense({ year: importYear, month: importMonth, day, cat, amount: Math.abs(amount), notes });
+    const existing = merchants[merchant];
+    merchants[merchant] = { cat, count: (existing?.count || 0) + 1 };
+    saved++;
+  }
+  saveMerchants();
+  renderCards();
+  renderTable();
+
+  // Build skipped list for display
+  const skippedRows = [];
+  for (let i = 0; i < importedRows.length; i++) {
+    const cat = document.getElementById(`rv-cat-${i}`)?.value;
+    const amount = importedRows[i].amount;
+    const day = importedRows[i].day || null;
+    if (!cat) continue;
+    const dup = (getMonthData(importYear, importMonth)||[]).find(e =>
+      e.cat === cat && Math.abs(Math.abs(e.amount) - Math.abs(amount)) < 0.01 && (day == null || e.day === day)
+    );
+    if (dup) skippedRows.push(importedRows[i]);
+  }
+
+  const resultEl = document.getElementById('importResult');
+  const actionsEl = document.getElementById('importActions');
+  const confirmBtn = document.getElementById('confirmImportBtn');
+
+  let html = `<div style="display:flex;gap:24px;margin-bottom:${skippedRows.length?'12px':'0'}">
+    <div><span style="font-size:22px;font-weight:700;color:var(--income)">${saved}</span><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Importades</div></div>
+    ${skipped > 0 ? `<div><span style="font-size:22px;font-weight:700;color:var(--danger)">${skipped}</span><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ignorades (dups)</div></div>` : ''}
+  </div>`;
+  // Store skipped rows for interactive review
+  // Capture cat/notes from UI selectors BEFORE they get hidden
+  // Build a map: importedRows index -> {cat, notes} from UI
+  const uiValues = {};
+  for (let j = 0; j < importedRows.length; j++) {
+    const catEl   = document.getElementById('rv-cat-'+j);
+    const notesEl = document.getElementById('rv-notes-'+j);
+    if (catEl) uiValues[j] = { cat: catEl.value, notes: notesEl ? notesEl.value : importedRows[j].merchant };
+  }
+  window._skippedRows = skippedRows.map((r, i) => {
+    const origIdx = importedRows.indexOf(r);
+    const ui = uiValues[origIdx] || {};
+    return { ...r, cat: ui.cat || r.cat, _notes: ui.notes || r.merchant, _idx: i, _forceImport: false };
+  });
+
+  if (skippedRows.length) {
+    html += `<div style="font-size:12px;color:var(--muted);margin-bottom:8px;font-weight:600">Despeses ignorades per duplicades — clica per revisar:</div>`;
+    html += `<div id="skippedList">` + skippedRows.map((r,i) =>
+      `<div id="dup-row-${i}" onclick="openDupDetail(${i})" style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;border-radius:8px;border:1px solid var(--border);margin-bottom:6px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background=''">
+        <div>
+          <div style="font-family:'DM Mono',monospace;font-size:12px;font-weight:600">${r.merchant}</div>
+          <div style="font-size:11px;color:var(--muted)">${r.day ? r.day + ' · ' : ''}${fmtE(r.amount)}</div>
+        </div>
+        <div id="dup-status-${i}" style="font-size:11px;color:var(--muted)">Clicar per revisar →</div>
+      </div>`
+    ).join('') + `</div>`;
+  }
+
+  resultEl.innerHTML = html;
+  resultEl.style.display = 'block';
+  document.getElementById('reviewList').style.display = 'none';
+  confirmBtn.style.display = 'none';
+  actionsEl.querySelector('.btn.ghost').textContent = 'Tancar';
+  document.getElementById('importSkippedBtn').style.display = 'none';
+}
+
+// ============================================================
+// DUP DETAIL INTERACTION
+// ============================================================
+let _currentDupIdx = null;
+
+function openDupDetail(idx) {
+  _currentDupIdx = idx;
+  const r = window._skippedRows[idx];
+  document.getElementById('dupDetail-title').textContent = r.merchant;
+
+  // Find existing duplicate for comparison
+  const existingInMonth = (getMonthData(importYear, importMonth)||[]).find(e =>
+    Math.abs(e.amount - r.amount) < 0.01 && (r.day == null || e.day === r.day)
+  );
+
+  const existingHtml = existingInMonth
+    ? `<div style="padding:10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Ja existent</div>
+        <div style="font-family:'DM Mono',monospace;font-weight:600">${fmtE(existingInMonth.amount)}</div>
+        <div style="font-size:12px;color:var(--muted)">${existingInMonth.day ? 'Dia '+existingInMonth.day+' · ':''} ${getCat(existingInMonth.cat).name}${existingInMonth.notes ? ' · '+existingInMonth.notes : ''}</div>
+      </div>`
+    : '';
+
+  document.getElementById('dupDetail-body').innerHTML = `
+    ${existingHtml}
+    <div style="padding:10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:0">
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Nova entrada</div>
+      <div style="font-family:'DM Mono',monospace;font-weight:600">${fmtE(r.amount)}</div>
+      <div style="font-size:12px;color:var(--muted)">${r.day ? 'Dia '+r.day+' · ':''} ${r.date||''}</div>
+    </div>`;
+
+  // Populate cat select with current value (remembered or default)
+  const catSel = document.getElementById('dup-cat');
+  catSel.innerHTML = categories.filter(c => r.isPositive ? true : c.type!=='ingressos')
+    .map(c => `<option value="${c.id}" ${c.id===r.cat?'selected':''}>${c.name}</option>`).join('') +
+    '<option value="__new__" style="color:var(--accent);font-weight:600">+ Nova categoria...</option>';
+  catSel.onchange = () => handleCatSelect('dup-cat');
+
+  // Populate notes (remembered from previous open, or merchant name)
+  document.getElementById('dup-notes').value = r._notes != null ? r._notes : (r.notes || r.merchant);
+
+  document.getElementById('importResult').style.display = 'none';
+  document.getElementById('dupDetail').style.display = 'block';
+}
+
+function closeDupDetail() {
+  // Save edited cat & notes back to skippedRow state
+  if (_currentDupIdx !== null) {
+    const r = window._skippedRows[_currentDupIdx];
+    r.cat = document.getElementById('dup-cat').value;
+    r._notes = document.getElementById('dup-notes').value;
+    // Update row status to show it's been reviewed (if not imported)
+    if (!r._forceImport) {
+      const statusEl = document.getElementById(`dup-status-${_currentDupIdx}`);
+      if (statusEl) { statusEl.textContent = 'Revisada — clicar per tornar'; statusEl.style.color = 'var(--accent2)'; }
+      const rowEl = document.getElementById(`dup-row-${_currentDupIdx}`);
+      if (rowEl) { rowEl.style.opacity = '1'; rowEl.style.pointerEvents = ''; }
+    }
+  }
+  document.getElementById('dupDetail').style.display = 'none';
+  document.getElementById('importResult').style.display = 'block';
+  _currentDupIdx = null;
+}
+
+async function importDupRow() {
+  const idx = _currentDupIdx;
+  const r = window._skippedRows[idx];
+  // Use cat and notes from the detail form
+  const cat   = document.getElementById('dup-cat').value;
+  const notes = document.getElementById('dup-notes').value.trim() || r.merchant;
+  // Save back to state
+  r.cat    = cat;
+  r._notes = notes;
+  r._forceImport = true;
+
+  const newId = await addExpense({ year: importYear, month: importMonth, day: r.day||null, cat, amount: Math.abs(r.amount), notes });
+  if (!newId) { showToast('Error en guardar', 'error'); return; }
+  const existing = merchants[r.merchant];
+  merchants[r.merchant] = { cat, count: existing ? existing.count + 1 : 1 };
+  saveMerchants();
+  renderCards();
+  renderTable();
+
+  // Mark row as imported — still clickable to review
+  const statusEl = document.getElementById(`dup-status-${idx}`);
+  const rowEl    = document.getElementById(`dup-row-${idx}`);
+  if (statusEl) { statusEl.textContent = '✓ Importada — clicar per veure'; statusEl.style.color = 'var(--income)'; }
+  if (rowEl)    { rowEl.style.opacity = '1'; rowEl.style.pointerEvents = ''; }
+
+  // Update counters
+  const savedSpan = document.querySelector('#importResult span[style*="income"]');
+  if (savedSpan) savedSpan.textContent = parseInt(savedSpan.textContent||0) + 1;
+  const dupSpan = document.querySelector('#importResult span[style*="danger"]');
+  if (dupSpan) { const n = Math.max(0, parseInt(dupSpan.textContent||1)-1); dupSpan.textContent = n; }
+
+  // Close detail panel — NOT via closeDupDetail to avoid double-save
+  document.getElementById('dupDetail').style.display = 'none';
+  document.getElementById('importResult').style.display = 'block';
+  _currentDupIdx = null;
+}
+
+// ============================================================
+// MERCHANTS VIEW
+// ============================================================
+function renderMerchants() {
+  const search = (document.getElementById('merchantSearch')?.value || '').toLowerCase();
+  const container = document.getElementById('merchantsContainer');
+  if (!container) return;
+
+  const catOptions = categories.filter(c=>c.type!=='ingressos')
+    .map(c => `<option value="${c.id}">${c.name} (${c.type})</option>`).join('');
+
+  // Group by category
+  const grouped = {};
+  Object.entries(merchants).forEach(([name, data]) => {
+    if (search && !name.toLowerCase().includes(search)) return;
+    const catName = data.cat === '__skip__' ? '⊘ No importar' : (getCat(data.cat)?.name || data.cat);
+    if (!grouped[catName]) grouped[catName] = [];
+    grouped[catName].push({ name, cat: data.cat, count: data.count });
+  });
+
+  const sortedCats = Object.keys(grouped).sort();
+  if (!sortedCats.length) {
+    container.innerHTML = `<div class="empty-state">Cap comerç ${search ? 'trobat' : 'registrat encara'}.<br>Importa un extracte per començar.</div>`;
+    return;
+  }
+
+  container.innerHTML = sortedCats.map(catName => `
+    <div class="merchant-group">
+      <div class="merchant-group-title">${catName} <span style="font-weight:400">(${grouped[catName].length})</span></div>
+      ${grouped[catName].sort((a,b)=>a.name.localeCompare(b.name)).map(m => `
+        <div class="merchant-row">
+          <div class="merchant-name">${m.name}</div>
+          <select style="width:180px;font-size:12px" onchange="updateMerchantCat('${m.name.replace(/'/g,"\'")}',this.value)">
+            ${categories.filter(c=>c.type!=='ingressos').map(c =>
+              `<option value="${c.id}" ${c.id===m.cat?'selected':''}>${c.name}</option>`
+            ).join('')}
+          </select>
+          <div class="merchant-count">${m.count}x</div>
+          <button class="btn danger sm" onclick="deleteMerchant('${m.name.replace(/'/g,"\'")}')">Del</button>
+        </div>`).join('')}
+    </div>`).join('');
+}
+
+async function updateMerchantCat(name, cat) {
+  await putMerchant({ name, cat, count: merchants[name]?.count || 1 });
+  renderMerchants();
+  showToast('Comerç actualitzat');
+}
+
+async function deleteMerchant(name) {
+  if (!confirm(`Eliminar "${name}"?`)) return;
+  await delMerchant(name);
+  renderMerchants();
+  showToast('Comerç eliminat');
+}
+
+// ============================================================
+// RESET
+
+
+// ============================================================
+// INIT
+// ============================================================
+function showApp() {
+  document.getElementById('loginScreen').classList.remove('visible');
+  document.getElementById('diag').style.display = 'none';
+  document.querySelectorAll('header, .app').forEach(el => el.style.removeProperty('display'));
+  // Show only the active tab
+  document.querySelectorAll('.app').forEach(el => {
+    if (!el.classList.contains('visible')) el.style.display = 'none';
+  });
+  document.querySelector('.app.visible').style.display = 'block';
+}
+
+function showLogin() {
+  document.getElementById('loginScreen').classList.add('visible');
+  document.querySelectorAll('header, .app#tab-mes, .app#tab-anual, .app#tab-grafics, .app#tab-categories, .app#tab-merchants, .app#tab-analisi').forEach(el => el.style.display = 'none');
+}
+
+async function onAuthChange(session) {
+  const diag = document.getElementById('diag');
+  const btn = document.getElementById('login-btn');
+  if (session?.user) {
+    currentUser = session.user;
+    document.getElementById('userEmailBadge').textContent = session.user.email?.split('@')[0] || '';
+    diag.textContent = 'Carregant dades...';
+    diag.style.display = 'block';
+    diag.style.background = '#fef9c3';
+    diag.style.color = '#713f12';
+
+    // Timeout safety — if loadAll hangs for 15s, show error
+    const timeout = setTimeout(() => {
+      diag.style.background = '#fee2e2';
+      diag.style.color = '#dc2626';
+      diag.textContent = 'ERROR: Temps esgotat connectant a Supabase. Comprova la connexió a internet.';
+      if (btn) { btn.innerHTML = 'Entrar'; btn.disabled = false; }
+    }, 15000);
+
+    try {
+      await loadAll();
+      clearTimeout(timeout);
+      state.month = new Date().getMonth();
+      renderMonthTabs();
+      renderCards();
+      renderTable();
+      initAnalysisSelectors();
+      diag.style.display = 'none';
+      showApp();
+      if (btn) { btn.innerHTML = 'Entrar'; btn.disabled = false; }
+    } catch(err) {
+      clearTimeout(timeout);
+      diag.style.background = '#fee2e2';
+      diag.style.color = '#dc2626';
+      diag.textContent = 'ERROR carregant dades: ' + err.message;
+      if (btn) { btn.innerHTML = 'Entrar'; btn.disabled = false; }
+    }
+  } else {
+    currentUser = null;
+    expenses = {}; categories = []; merchants = {};
+    showLogin();
+    if (btn) { btn.innerHTML = 'Entrar'; btn.disabled = false; }
+  }
+}
+
+async function init() {
+  // Setup PWA manifest
+  const manifest = { name:'Despeses Personals', short_name:'Despeses', start_url:'https://bernatns.github.io/despeses/', display:'standalone', background_color:'#f4f5f7', theme_color:'#ffffff', icons:[] };
+  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+  document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
+
+  // Show login initially
+  showLogin();
+
+  // Listen to auth state
+  sb.auth.onAuthStateChange((_event, session) => onAuthChange(session));
+
+  // Check existing session
+  const { data: { session } } = await sb.auth.getSession();
+  await onAuthChange(session);
+}
+
+init();
+</script>
+</body>
+</html>
