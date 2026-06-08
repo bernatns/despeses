@@ -285,6 +285,11 @@
   .data-menu-item:hover { background:var(--surface2); }
   .data-menu-item.danger { color:var(--danger); }
 
+  @media(max-width:600px) {
+    .hide-mobile { display:none; }
+    .amount-cell { font-size:13px; }
+    .cat-badge { font-size:11px; padding:2px 6px; }
+  }
   /* FORMAT CONFIGURATOR */
   .fmt-line { display:flex; align-items:center; gap:6px; padding:5px 8px; border-radius:6px; font-family:'DM Mono',monospace; font-size:12px; background:var(--surface2); border:1px solid var(--border); cursor:pointer; transition:border-color 0.15s; }
   .fmt-line:hover { border-color: var(--accent); }
@@ -365,12 +370,11 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.1</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.2</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
       <div style="position:relative">
-        <button class="btn ghost" style="font-size:12px;padding:5px 10px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="userNameBtn" onclick="openUserModal()" title="Compte"></button>
         <button class="btn ghost" style="font-size:12px;padding:5px 10px" onclick="toggleDataMenu()" id="dataMenuBtn">⚙</button>
         <div id="dataMenu" style="display:none;position:absolute;right:0;top:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.12);z-index:200;min-width:210px;padding:6px">
 <button class="data-menu-item" onclick="exportBackup()">↑ Exportar backup</button>
@@ -431,14 +435,14 @@
     <button class="btn" onclick="openAddModal()">+ Afegir despesa</button>
   </div>
 
-  <div class="table-wrap">
-    <table>
+  <div class="table-wrap" style="overflow-x:auto">
+    <table style="min-width:0;width:100%">
       <thead>
         <tr>
           <th>Categoria</th>
           <th>Import</th>
-          <th>Tipus</th>
-          <th>Notes</th>
+          <th class="hide-mobile">Tipus</th>
+          <th class="hide-mobile">Notes</th>
           <th>Accions</th>
         </tr>
       </thead>
@@ -1201,11 +1205,11 @@ function saveDisplayName() {
 }
 
 function updateUserNameBtn() {
-  const btn = document.getElementById('userNameBtn');
-  if (!btn) return;
+  const nameEl = document.getElementById('userNameBtn');
+  const emailEl = document.getElementById('userEmailInMenu');
   const name = lsGet('user_display_name') || currentUser?.user_metadata?.full_name || currentUser?.email?.split('@')[0] || '';
-  btn.textContent = name;
-  btn.title = currentUser?.email || '';
+  if (nameEl) nameEl.textContent = name;
+  if (emailEl) emailEl.textContent = currentUser?.email || '';
 }
 
 async function deleteUser() {}
