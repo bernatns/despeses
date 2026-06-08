@@ -365,7 +365,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.0</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.1</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -420,6 +420,11 @@
   </div>
 
   <div class="month-tabs" id="monthTabs"></div>
+
+  <div class="chart-card" id="monthBarWrap" style="margin-bottom:16px">
+    <div class="chart-title">Despeses per categoria — <span id="monthBarTitle"></span></div>
+    <div class="bar-chart" id="monthBarChart"></div>
+  </div>
 
   <div class="section-header">
     <div class="section-title" id="mesTitle">Despeses del mes</div>
@@ -531,10 +536,11 @@
     <div class="section-title">Categories</div>
     <button class="btn" onclick="openCatModal()">+ Nova categoria</button>
   </div>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Arrossega les files per canviar l'ordre. L'ordre afecta les taules i gràfics.</p>
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th>Nom</th><th>Tipus</th><th>Color</th><th>Accions</th></tr>
+        <tr><th style="width:32px"></th><th>Nom</th><th>Tipus</th><th>Accions</th></tr>
       </thead>
       <tbody id="catTable"></tbody>
     </table>
@@ -1458,6 +1464,33 @@ function renderMonthTabs() {
   el.innerHTML = MONTHS.map((m, i) => `<div class="month-tab ${i===state.month?'active':''}" onclick="selectMonth(${i})">${m.substring(0,3)}</div>`).join('');
 }
 
+function renderMonthBar() {
+  const yr = state.year, mo = state.month;
+  const wrap = document.getElementById('monthBarWrap');
+  const chart = document.getElementById('monthBarChart');
+  const title = document.getElementById('monthBarTitle');
+  if (!wrap || !chart) return;
+  title.textContent = MONTHS[mo] + ' ' + yr;
+  const data = getMonthData(yr, mo).filter(e => getCat(e.cat).type !== 'ingressos' && !e.pending);
+  // Aggregate by category
+  const catTotals = {};
+  data.forEach(e => { catTotals[e.cat] = (catTotals[e.cat]||0) + Math.abs(e.amount); });
+  // Sort by categories order (user-defined)
+  const sorted = categories
+    .filter(c => c.type !== 'ingressos' && catTotals[c.id] > 0)
+    .map(c => [c.id, catTotals[c.id]]);
+  if (!sorted.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const maxVal = Math.max(...sorted.map(([,v]) => v));
+  const COLORS = ['var(--accent)','var(--accent2)','#f5a060','#f56060','#c060f5','#60f5a0','#f5e060','#60a0f5'];
+  chart.innerHTML = sorted.map(([cid, v], i) => `
+    <div class="bar-row">
+      <div class="bar-label">${getCat(cid).name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/maxVal*100).toFixed(1)}%;background:${COLORS[i%COLORS.length]}"></div></div>
+      <div class="bar-value">${fmtE(v)}</div>
+    </div>`).join('');
+}
+
 function renderCards() {
   refreshYearSelector();
   const { nomina, totalExp, fixed, variable, estalvi } = calcMonth(state.year, state.month);
@@ -1895,16 +1928,45 @@ function renderCompareTable() {
 function renderCategories() {
   const tbody = document.getElementById('catTable');
   const typeLabel = {fixa:'Fixa',variable:'Variable',ingressos:'Ingressos'};
-  tbody.innerHTML = categories.map(c=>`
-    <tr>
+  const typeColor = {fixa:'var(--accent2)',variable:'#f5a060',ingressos:'var(--income)'};
+  tbody.innerHTML = categories.map((c,i)=>`
+    <tr draggable="true" data-idx="${i}" data-id="${c.id}"
+        ondragstart="catDragStart(event,${i})"
+        ondragover="catDragOver(event)"
+        ondrop="catDrop(event,${i})"
+        ondragend="catDragEnd()"
+        style="cursor:grab">
+      <td style="color:var(--muted);font-size:18px;padding:8px 12px;cursor:grab">⠿</td>
       <td>${c.name}</td>
-      <td><span class="cat-badge">${typeLabel[c.type]||c.type}</span></td>
-      <td>—</td>
+      <td><span class="cat-badge" style="color:${typeColor[c.type]||'var(--muted)'}">${typeLabel[c.type]||c.type}</span></td>
       <td><div class="action-cell">
         <button class="btn ghost sm" onclick="editCat('${c.id}')">Edita</button>
         ${!DEFAULT_CATS.find(d=>d.id===c.id)?`<button class="btn danger sm" onclick="deleteCat('${c.id}')">Del</button>`:''}
       </div></td>
     </tr>`).join('');
+}
+
+let _dragIdx = null;
+function catDragStart(e, idx) {
+  _dragIdx = idx;
+  e.currentTarget.style.opacity = '0.5';
+}
+function catDragOver(e) { e.preventDefault(); }
+function catDragEnd() {
+  document.querySelectorAll('#catTable tr').forEach(r => r.style.opacity = '1');
+  _dragIdx = null;
+}
+async function catDrop(e, toIdx) {
+  e.preventDefault();
+  if (_dragIdx === null || _dragIdx === toIdx) return;
+  const moved = categories.splice(_dragIdx, 1)[0];
+  categories.splice(toIdx, 0, moved);
+  await saveCategories();
+  renderCategories();
+  // Refresh all views that depend on category order
+  renderMonthBar();
+  if (document.getElementById('tab-grafics').classList.contains('visible')) renderCharts();
+  if (document.getElementById('tab-anual').classList.contains('visible')) renderAnnual();
 }
 
 // ============================================================
@@ -2186,6 +2248,7 @@ function selectMonth(m) {
   renderMonthTabs();
   renderCards();
   renderTable();
+  renderMonthBar();
 }
 
 function onYearChange() {
