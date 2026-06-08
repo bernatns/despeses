@@ -1265,68 +1265,68 @@ async function confirmBackupMerge() {
   const backup = _pendingBackup;
   if (!backup) return;
 
-  const currentExp = lsGet(LS_EXPENSES) || [];
-  const backupExp  = backup.expenses || [];
+  const btn = document.getElementById('backupMergeConfirmBtn');
+  btn.disabled = true;
+  btn.textContent = 'Important...';
 
-  // Find which dups to skip (those with checkbox checked = skip)
+  const dupKey = e => `${e.year}-${e.month}-${e.cat}-${Math.abs(e.amount)}-${e.day||''}`;
+
+  // Find dups to skip
   const skipDups = new Set();
   document.querySelectorAll('#backupMergeDups input[type=checkbox]').forEach(cb => {
     if (cb.checked) skipDups.add(parseInt(cb.dataset.dupidx));
   });
-
-  const dupKey = e => `${e.year}-${e.month}-${e.cat}-${Math.abs(e.amount)}-${e.day||''}`;
   const skippedDupKeys = new Set(
-    (window._backupDups || [])
-      .filter((_,i) => skipDups.has(i))
-      .map(dupKey)
+    (window._backupDups || []).filter((_,i) => skipDups.has(i)).map(dupKey)
   );
 
-  // Merge: start with current, add backup entries that are not skipped dups
-  const currentKeys = new Set(currentExp.map(dupKey));
-  const toAdd = backupExp.filter(e => !skippedDupKeys.has(dupKey(e)));
-
-  // Re-assign IDs to avoid conflicts
-  let maxId = currentExp.length ? Math.max(...currentExp.map(e=>e.id||0)) : 0;
-  const merged = [...currentExp, ...toAdd.map(e => ({ ...e, id: ++maxId }))];
-
-  // Merge categories (add missing ones from backup)
-  const currentCatIds = new Set((lsGet(LS_CATS)||[]).map(c=>c.id));
+  const backupExp  = (backup.expenses  || []).filter(e => !skippedDupKeys.has(dupKey(e)));
   const backupCats = backup.categories || [];
-  const mergedCats = [...(lsGet(LS_CATS)||[])];
-  backupCats.forEach(c => { if (!currentCatIds.has(c.id)) mergedCats.push(c); });
+  const backupMerch = backup.merchants || {};
 
-  // Merge merchants (backup wins on conflict)
-  const mergedMerchants = { ...(lsGet(LS_MERCHANTS)||{}), ...(backup.merchants||{}) };
-
-  // Save merged data to Supabase
   if (currentUser) {
     const uid = currentUser.id;
-    // Clear and re-insert expenses
+    const BATCH = 50; // Supabase batch size
+
+    btn.textContent = 'Esborrant dades anteriors...';
     await sb.from('expenses').delete().eq('user_id', uid);
-    for (const e of merged) {
-      await sb.from('expenses').insert({ user_id: uid, year: e.year, month: e.month, day: e.day||null, cat: e.cat, amount: e.amount, notes: e.notes||'', pending: e.pending||false });
-    }
-    // Save categories
     await sb.from('categories').delete().eq('user_id', uid);
-    for (const c of mergedCats) {
-      await sb.from('categories').upsert({ user_id: uid, cat_id: c.id, name: c.name, type: c.type });
-    }
-    // Save merchants
     await sb.from('merchants').delete().eq('user_id', uid);
-    for (const [name, data] of Object.entries(mergedMerchants)) {
-      await sb.from('merchants').upsert({ user_id: uid, merchant_name: name, cat: data.cat, count: data.count });
+
+    // Insert expenses in batches
+    const expRows = backupExp.map(e => ({
+      user_id: uid, year: e.year, month: e.month, day: e.day||null,
+      cat: e.cat, amount: e.amount, notes: e.notes||'', pending: e.pending||false
+    }));
+    for (let i = 0; i < expRows.length; i += BATCH) {
+      btn.textContent = `Important despeses ${i}/${expRows.length}...`;
+      const { error } = await sb.from('expenses').insert(expRows.slice(i, i + BATCH));
+      if (error) { showToast('Error: ' + error.message, 'error'); btn.disabled = false; btn.textContent = 'Combinar i restaurar'; return; }
+    }
+
+    // Insert categories in one batch
+    btn.textContent = 'Guardant categories...';
+    const catRows = backupCats.map(c => ({ user_id: uid, cat_id: c.id, name: c.name, type: c.type }));
+    if (catRows.length) await sb.from('categories').upsert(catRows);
+
+    // Insert merchants in batches
+    const merchRows = Object.entries(backupMerch).map(([name, data]) => ({
+      user_id: uid, merchant_name: name, cat: data.cat, count: data.count
+    }));
+    for (let i = 0; i < merchRows.length; i += BATCH) {
+      await sb.from('merchants').upsert(merchRows.slice(i, i + BATCH));
     }
   }
 
+  btn.textContent = 'Carregant dades...';
   await loadAll();
   closeModal('backupMergeModal');
+  btn.disabled = false;
+  btn.textContent = 'Combinar i restaurar';
   renderMonthTabs();
   renderCards();
   renderTable();
-
-  const skipped = skipDups.size;
-  const added = toAdd.length - (backupExp.filter(e => skippedDupKeys.has(dupKey(e))).length);
-  showToast(`Backup combinat: ${added} entrades afegides${skipped ? ', ' + skipped + ' dups ignorades' : '!'}`);
+  showToast(`${backupExp.length} entrades importades!`);
   _pendingBackup = null;
 }
 
