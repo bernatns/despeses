@@ -1326,7 +1326,7 @@ async function confirmBackupMerge() {
     await sb.from('categories').delete().eq('user_id', uid);
     await sb.from('merchants').delete().eq('user_id', uid);
 
-    // Insert expenses in batches
+    // Insert expenses in batches — use .select() to get Supabase-generated IDs
     const expRows = backupExp.map(e => ({
       user_id: uid, year: e.year, month: e.month, day: e.day||null,
       cat: e.cat, amount: e.amount, notes: e.notes||'', pending: e.pending||false
@@ -1336,6 +1336,7 @@ async function confirmBackupMerge() {
       const { error } = await sb.from('expenses').insert(expRows.slice(i, i + BATCH));
       if (error) { showToast('Error: ' + error.message, 'error'); btn.disabled = false; btn.textContent = 'Combinar i restaurar'; return; }
     }
+    // After inserting, loadAll will fetch the correct IDs from Supabase
 
     // Insert categories in one batch
     btn.textContent = 'Guardant categories...';
