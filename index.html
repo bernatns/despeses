@@ -989,8 +989,9 @@ async function doLogin() {
     } else {
       res = await sb.auth.signInWithPassword({ email, password: pass });
       if (res.error) throw res.error;
-      // Load app directly from the response, don't wait for onAuthStateChange
+      // Load app directly from the response
       if (res.data.session) {
+        _authHandled = true; // prevent duplicate from onAuthStateChange
         await onAuthChange(res.data.session);
         return;
       }
@@ -1005,6 +1006,7 @@ async function doLogin() {
 
 async function doLogout() {
   document.getElementById('dataMenu').style.display = 'none';
+  _authHandled = false;
   await sb.auth.signOut();
 }
 
@@ -3002,6 +3004,8 @@ async function onAuthChange(session) {
   }
 }
 
+let _authHandled = false;
+
 async function init() {
   // Setup PWA manifest
   const manifest = { name:'Despeses Personals', short_name:'Despeses', start_url:'https://bernatns.github.io/despeses/', display:'standalone', background_color:'#f4f5f7', theme_color:'#ffffff', icons:[] };
@@ -3011,12 +3015,14 @@ async function init() {
   // Show login initially
   showLogin();
 
-  // Listen to auth state
-  sb.auth.onAuthStateChange((_event, session) => onAuthChange(session));
-
-  // Check existing session
-  const { data: { session } } = await sb.auth.getSession();
-  await onAuthChange(session);
+  // Use ONLY onAuthStateChange — it fires immediately with existing session
+  // This avoids double-calling onAuthChange when session exists
+  sb.auth.onAuthStateChange((_event, session) => {
+    if (!_authHandled || _event === 'SIGNED_OUT') {
+      _authHandled = true;
+      onAuthChange(session);
+    }
+  });
 }
 
 init();
