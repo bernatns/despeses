@@ -365,7 +365,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v1.9</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.0</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -2778,30 +2778,32 @@ function openReviewModal() {
 
 async function confirmImport() {
   let saved = 0, skipped = 0;
+  // Track status of each row for display
+  const rowStatus = []; // 'imported' | 'skipped_manual' | 'dup' | 'dup_existing'
+
   for (let i = 0; i < importedRows.length; i++) {
     const merchant = importedRows[i].merchant;
     const amount   = importedRows[i].amount;
     const day      = importedRows[i].day || null;
-    // Check skip checkbox
     const skipEl = document.getElementById(`rv-skip-${i}`);
     const doSkip = skipEl ? skipEl.checked : (importedRows[i]._skipOverride || importedRows[i].wasSkip);
     if (doSkip) {
-      // Save merchant as __skip__ so future imports ignore it automatically
       merchants[merchant] = { cat: '__skip__', count: (merchants[merchant]?.count || 0) + 1 };
       skipped++;
+      rowStatus.push('skipped_manual');
       continue;
     }
     const cat   = document.getElementById(`rv-cat-${i}`).value;
     const notes = document.getElementById(`rv-notes-${i}`).value.trim();
-    // Duplicate check
     const dup = (getMonthData(importYear, importMonth)||[]).find(e =>
       e.cat === cat && Math.abs(Math.abs(e.amount) - Math.abs(amount)) < 0.01 && (day == null || e.day === day)
     );
-    if (dup) { skipped++; continue; }
+    if (dup) { skipped++; rowStatus.push('dup'); continue; }
     await addExpense({ year: importYear, month: importMonth, day, cat, amount: Math.abs(amount), notes });
     const existing = merchants[merchant];
     merchants[merchant] = { cat, count: (existing?.count || 0) + 1 };
     saved++;
+    rowStatus.push('imported');
   }
   saveMerchants();
   renderCards();
@@ -2824,9 +2826,30 @@ async function confirmImport() {
   const actionsEl = document.getElementById('importActions');
   const confirmBtn = document.getElementById('confirmImportBtn');
 
+  // Build per-row status indicators
+  const statusColors = { imported: 'var(--income)', dup: 'var(--danger)', skipped_manual: 'var(--muted)' };
+  const statusLabels = { imported: '✓ Importada', dup: '⚠ Duplicada', skipped_manual: '⊘ Ignorada' };
+
+  // Update each review row with its status
+  rowStatus.forEach((status, i) => {
+    const row = document.getElementById(`review-${i}`);
+    if (row) {
+      row.style.opacity = status === 'imported' ? '1' : '0.5';
+      const badge = document.createElement('span');
+      badge.style.cssText = `font-size:11px;font-weight:700;color:${statusColors[status]};margin-left:8px`;
+      badge.textContent = statusLabels[status];
+      const merchantEl = row.querySelector('.review-merchant');
+      if (merchantEl) {
+        merchantEl.querySelectorAll('.status-badge').forEach(b => b.remove());
+        badge.className = 'status-badge';
+        merchantEl.appendChild(badge);
+      }
+    }
+  });
+
   let html = `<div style="display:flex;gap:24px;margin-bottom:${skippedRows.length?'12px':'0'}">
     <div><span style="font-size:22px;font-weight:700;color:var(--income)">${saved}</span><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Importades</div></div>
-    ${skipped > 0 ? `<div><span style="font-size:22px;font-weight:700;color:var(--danger)">${skipped}</span><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ignorades (dups)</div></div>` : ''}
+    ${skipped > 0 ? `<div><span style="font-size:22px;font-weight:700;color:var(--danger)">${skipped}</span><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ignorades</div></div>` : ''}
   </div>`;
   // Store skipped rows for interactive review
   // Capture cat/notes from UI selectors BEFORE they get hidden
@@ -2858,7 +2881,8 @@ async function confirmImport() {
 
   resultEl.innerHTML = html;
   resultEl.style.display = 'block';
-  document.getElementById('reviewList').style.display = 'none';
+  // Keep reviewList visible so user sees per-row status
+  document.getElementById('reviewList').style.display = 'flex';
   confirmBtn.style.display = 'none';
   actionsEl.querySelector('.btn.ghost').textContent = 'Tancar';
   document.getElementById('importSkippedBtn').style.display = 'none';
@@ -2942,8 +2966,7 @@ async function importDupRow() {
   const newId = await addExpense({ year: importYear, month: importMonth, day: r.day||null, cat, amount: Math.abs(r.amount), notes });
   if (!newId) { showToast('Error en guardar', 'error'); return; }
   const existing = merchants[r.merchant];
-  merchants[r.merchant] = { cat, count: existing ? existing.count + 1 : 1 };
-  saveMerchants();
+  await putMerchant({ name: r.merchant, cat, count: (existing?.count || 0) + 1 });
   renderCards();
   renderTable();
 
