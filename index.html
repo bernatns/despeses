@@ -2939,7 +2939,13 @@ async function deleteMerchant(name) {
 // ============================================================
 function showApp() {
   document.getElementById('loginScreen').classList.remove('visible');
-  document.querySelectorAll('header, .app, #diag').forEach(el => el.style.display = '');
+  document.getElementById('diag').style.display = 'none';
+  document.querySelectorAll('header, .app').forEach(el => el.style.removeProperty('display'));
+  // Show only the active tab
+  document.querySelectorAll('.app').forEach(el => {
+    if (!el.classList.contains('visible')) el.style.display = 'none';
+  });
+  document.querySelector('.app.visible').style.display = 'block';
 }
 
 function showLogin() {
