@@ -370,7 +370,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.7</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.8</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -507,53 +507,57 @@
 
         <div class="form-row">
           <div class="form-label">Vendes del mes (€)</div>
-          <input type="number" id="hc-vendes" step="0.01" placeholder="0.00" oninput="calcSalary()">
+          <input type="number" id="hc-vendes" step="0.01" placeholder="0.00" oninput="saveSalaryField('hc-vendes')">
         </div>
         <div class="form-row">
           <div class="form-label">Base de cotització (€)</div>
-          <input type="number" id="hc-base" step="0.01" value="4909.5" oninput="calcSalary()">
+          <input type="number" id="hc-base" step="0.01" oninput="saveSalaryField('hc-base')">
         </div>
         <div class="form-row">
           <div class="form-label">Base (sou fix) (€)</div>
-          <input type="number" id="hc-basefija" step="0.01" value="1850.54" oninput="calcSalary()">
+          <input type="number" id="hc-basefija" step="0.01" oninput="saveSalaryField('hc-basefija')">
         </div>
         <div class="form-row">
           <div class="form-label">Increment (€)</div>
-          <input type="number" id="hc-inc" step="0.01" value="166.67" oninput="calcSalary()">
+          <input type="number" id="hc-inc" step="0.01" oninput="saveSalaryField('hc-inc')">
         </div>
         <div class="form-row">
           <div class="form-label">Extras (€)</div>
-          <input type="number" id="hc-extras" step="0.01" value="565.35" oninput="calcSalary()">
+          <input type="number" id="hc-extras" step="0.01" oninput="saveSalaryField('hc-extras')">
         </div>
         <div class="form-row">
           <div class="form-label">Comissió per vendes (%)</div>
-          <input type="number" id="hc-compct" step="0.01" value="0.25" oninput="calcSalary()">
+          <input type="number" id="hc-compct" step="0.01" oninput="saveSalaryField('hc-compct')">
         </div>
         <div class="form-row">
-          <div class="form-label">Volum objectiu (€)</div>
-          <input type="number" id="hc-volobj" step="1" value="1181632" oninput="calcSalary()">
+          <div class="form-label">Volum objectiu absolut (€)</div>
+          <input type="number" id="hc-volobj" step="1" oninput="saveSalaryField('hc-volobj')">
         </div>
         <div class="form-row">
-          <div class="form-label">Plus objectiu (€)</div>
-          <input type="number" id="hc-plusobj" step="0.01" value="0" oninput="calcSalary()">
+          <div class="form-label">Vol. abs (plus si s'assoleix objectiu) (€)</div>
+          <input type="number" id="hc-volabs" step="0.01" oninput="saveSalaryField('hc-volabs')">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Plus objectiu addicional (€)</div>
+          <input type="number" id="hc-plusobj" step="0.01" oninput="saveSalaryField('hc-plusobj')">
         </div>
 
         <!-- Deductions -->
         <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:10px">
-          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:10px">Deduccions</div>
-          <div style="display:grid;grid-template-columns:1fr auto;gap:6px;font-size:12px">
-            <span style="color:var(--muted)">Cont. comuni. <span id="hc-lbl-comu"></span></span>
-            <input type="number" id="hc-comu" step="0.01" value="4.7" style="width:70px;text-align:right" oninput="calcSalary()">
-            <span style="color:var(--muted)">Formació <span id="hc-lbl-form"></span></span>
-            <input type="number" id="hc-form" step="0.01" value="0.1" style="width:70px;text-align:right" oninput="calcSalary()">
-            <span style="color:var(--muted)">Desocupació <span id="hc-lbl-desemp"></span></span>
-            <input type="number" id="hc-desemp" step="0.01" value="1.55" style="width:70px;text-align:right" oninput="calcSalary()">
-            <span style="color:var(--muted)">IRPF <span id="hc-lbl-irpf"></span></span>
-            <input type="number" id="hc-irpf" step="0.01" value="31.91" style="width:70px;text-align:right" oninput="calcSalary()">
-            <span style="color:var(--muted)">MEI <span id="hc-lbl-mei"></span></span>
-            <input type="number" id="hc-mei" step="0.01" value="0.13" style="width:70px;text-align:right" oninput="calcSalary()">
-            <span style="color:var(--muted)">Solidaritat</span>
-            <input type="number" id="hc-solid" step="0.01" value="1.76" style="width:70px;text-align:right" oninput="calcSalary()">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:10px">Deduccions (%)</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:6px;font-size:12px;align-items:center">
+            <span style="color:var(--muted)">Cont. comunitària <span id="hc-lbl-comu" style="color:var(--danger)"></span></span>
+            <input type="number" id="hc-comu" step="0.01" style="width:70px;text-align:right" oninput="saveSalaryField('hc-comu')">
+            <span style="color:var(--muted)">Formació <span id="hc-lbl-form" style="color:var(--danger)"></span></span>
+            <input type="number" id="hc-form" step="0.01" style="width:70px;text-align:right" oninput="saveSalaryField('hc-form')">
+            <span style="color:var(--muted)">Desocupació <span id="hc-lbl-desemp" style="color:var(--danger)"></span></span>
+            <input type="number" id="hc-desemp" step="0.01" style="width:70px;text-align:right" oninput="saveSalaryField('hc-desemp')">
+            <span style="color:var(--muted)">IRPF <span id="hc-lbl-irpf" style="color:var(--danger)"></span></span>
+            <input type="number" id="hc-irpf" step="0.01" style="width:70px;text-align:right" oninput="saveSalaryField('hc-irpf')">
+            <span style="color:var(--muted)">MEI <span id="hc-lbl-mei" style="color:var(--danger)"></span></span>
+            <input type="number" id="hc-mei" step="0.01" style="width:70px;text-align:right" oninput="saveSalaryField('hc-mei')">
+            <span style="color:var(--muted)">Solidaritat (€ fix)</span>
+            <input type="number" id="hc-solid" step="0.01" style="width:70px;text-align:right" oninput="saveSalaryField('hc-solid')">
           </div>
         </div>
 
@@ -562,6 +566,8 @@
           <div style="display:grid;grid-template-columns:1fr auto;gap:8px;font-size:13px">
             <span style="color:var(--muted)">Comissió</span>
             <span id="hc-r-com" style="font-family:'DM Mono',monospace;text-align:right;font-weight:600"></span>
+            <span style="color:var(--muted)">Plus objectiu</span>
+            <span id="hc-r-plus" style="font-family:'DM Mono',monospace;text-align:right;font-weight:600"></span>
             <span style="color:var(--muted)">Total brut</span>
             <span id="hc-r-brut" style="font-family:'DM Mono',monospace;text-align:right;font-weight:600"></span>
             <span style="color:var(--muted)">Total deduccions</span>
@@ -2376,56 +2382,79 @@ const HIST_SEED = {
   2025:{0:4241.22,1:3616,2:7683,3:4072,4:3883,5:3991,6:4148,7:3751,8:3839,9:4199,10:2993,11:3820},
 };
 
-function renderHistoric() {
-  const MONTHS_SHORT = ['Gen','Feb','Mar','Abr','Mai','Jun','Jul','Ago','Set','Oct','Nov','Des'];
-
-  // Merge Excel seed data with live app data (app takes priority for 2021+)
-  const nomData = {}; // yr -> {mo: val}
-
-  // Start with seed data
+function getHistoricData() {
+  // Load user edits from localStorage
+  const edits = lsGet('hist_edits') || {};
+  const nomData = {};
+  // Seed data
   Object.entries(HIST_SEED).forEach(([yr, months]) => {
-    const y = parseInt(yr);
-    nomData[y] = {...months};
+    nomData[parseInt(yr)] = {...months};
   });
-
-  // Override/add with live app data
-  const appYears = getAvailableYears();
-  appYears.forEach(yr => {
+  // App data overrides seed for 2021+
+  getAvailableYears().forEach(yr => {
     for (let mo = 0; mo < 12; mo++) {
       const nom = getMonthData(yr, mo)
         .filter(e => getCat(e.cat).type === 'ingressos')
         .reduce((s, e) => s + Math.abs(e.amount), 0);
-      if (nom > 0) {
-        if (!nomData[yr]) nomData[yr] = {};
-        nomData[yr][mo] = nom;
-      }
+      if (nom > 0) { if (!nomData[yr]) nomData[yr] = {}; nomData[yr][mo] = nom; }
     }
   });
+  // Apply user manual edits (override everything)
+  Object.entries(edits).forEach(([key, val]) => {
+    const [yr, mo] = key.split('-').map(Number);
+    if (!nomData[yr]) nomData[yr] = {};
+    if (val === null || val === '') delete nomData[yr][mo];
+    else nomData[yr][mo] = parseFloat(val);
+  });
+  return nomData;
+}
 
-  // Get all years sorted
-  const YEARS = [...new Set([...Object.keys(HIST_SEED).map(Number), ...appYears])].sort((a,b)=>a-b);
+function histCellEdit(yr, mo, val) {
+  const edits = lsGet('hist_edits') || {};
+  const key = `${yr}-${mo}`;
+  const parsed = parseFloat(val);
+  if (!val || isNaN(parsed)) delete edits[key];
+  else edits[key] = parsed;
+  lsSet('hist_edits', edits);
+  renderHistoric();
+}
+
+function renderHistoric() {
+  const MONTHS_SHORT = ['Gen','Feb','Mar','Abr','Mai','Jun','Jul','Ago','Set','Oct','Nov','Des'];
+  const nomData = getHistoricData();
+  // Include current year + next if Jan 1 has passed
+  const curYear = new Date().getFullYear();
+  const allYears = [...new Set([...Object.keys(HIST_SEED).map(Number), ...getAvailableYears(), curYear])].sort((a,b)=>a-b);
+  // Add next year column from Jan 1 onwards
+  const now = new Date();
+  if (now.getMonth() === 0 && now.getDate() >= 1) allYears.push(curYear + 1);
+  const YEARS = [...new Set(allYears)].sort((a,b)=>a-b);
 
   const thS = 'background:var(--surface2);padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-family:"DM Mono",monospace;white-space:nowrap;border:1px solid var(--border)';
-  const tdS = (bold, color) => `padding:7px 10px;border:1px solid var(--border);font-family:"DM Mono",monospace;font-size:12px;text-align:right;${bold?'font-weight:700;':''}${color?'color:'+color+';':''}`;
-  const tdL = 'padding:7px 10px;border:1px solid var(--border);font-size:12px;font-weight:600;white-space:nowrap;background:var(--surface2)';
+  const tdS = (bold,color) => `padding:4px 6px;border:1px solid var(--border);font-family:"DM Mono",monospace;font-size:12px;text-align:right;${bold?'font-weight:700;':''}${color?'color:'+color+';':''}`;
+  const tdL = 'padding:7px 10px;border:1px solid var(--border);font-size:12px;font-weight:600;white-space:nowrap;background:var(--surface2);position:sticky;left:0;z-index:1';
 
   let html = `<thead><tr>
-    <th style="${thS};text-align:left;position:sticky;left:0">Mes</th>
-    ${YEARS.map(y => `<th style="${thS}">${y}</th>`).join('')}
+    <th style="${thS};text-align:left;position:sticky;left:0;z-index:2">Mes</th>
+    ${YEARS.map(y=>`<th style="${thS}">${y}</th>`).join('')}
   </tr></thead><tbody>`;
 
-  // Monthly rows
   MONTHS_SHORT.forEach((m, mi) => {
-    const vals = YEARS.map(yr => (nomData[yr] || {})[mi] || 0);
-    if (vals.every(v => v === 0)) return;
-    html += `<tr>
-      <td style="${tdL};position:sticky;left:0">${m}</td>
-      ${vals.map(v => `<td style="${tdS(false,'')}">${v ? fmtE(v) : '—'}</td>`).join('')}
-    </tr>`;
+    html += `<tr><td style="${tdL}">${m}</td>`;
+    YEARS.forEach(yr => {
+      const val = (nomData[yr]||{})[mi];
+      html += `<td style="${tdS(false,'')}"><input type="number"
+        style="width:80px;border:none;background:transparent;font-family:'DM Mono',monospace;font-size:12px;text-align:right;color:var(--text);-moz-appearance:textfield"
+        value="${val ? val.toFixed(2) : ''}"
+        placeholder="—"
+        onchange="histCellEdit(${yr},${mi},this.value)"
+        onfocus="this.select()"></td>`;
+    });
+    html += '</tr>';
   });
 
-  // Mitjana row
-  html += `<tr style="background:rgba(0,0,0,0.02)"><td style="${tdL};position:sticky;left:0">Mitjana</td>`;
+  // Mitjana
+  html += `<tr style="background:rgba(0,0,0,0.02)"><td style="${tdL}">Mitjana</td>`;
   YEARS.forEach(yr => {
     const vals = Object.values(nomData[yr]||{}).filter(v=>v>0);
     const avg = vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : 0;
@@ -2433,31 +2462,51 @@ function renderHistoric() {
   });
   html += '</tr>';
 
-  // Total net row
-  html += `<tr style="background:rgba(37,99,235,0.04)"><td style="${tdL};position:sticky;left:0;color:var(--accent)">Total net</td>`;
+  // Total
+  html += `<tr style="background:rgba(37,99,235,0.04)"><td style="${tdL};color:var(--accent)">Total net</td>`;
   YEARS.forEach(yr => {
     const total = Object.values(nomData[yr]||{}).reduce((s,v)=>s+v,0);
     html += `<td style="${tdS(true,'var(--accent)')}">${total ? fmtE(total) : '—'}</td>`;
   });
   html += '</tr>';
 
-  // % canvi row
-  html += `<tr><td style="${tdL};position:sticky;left:0;color:var(--muted)">% canvi</td>`;
-  let prevTotal = null;
+  // % canvi
+  html += `<tr><td style="${tdL};color:var(--muted)">% canvi</td>`;
+  let prev = null;
   YEARS.forEach(yr => {
     const total = Object.values(nomData[yr]||{}).reduce((s,v)=>s+v,0);
-    if (prevTotal && prevTotal > 0 && total > 0) {
-      const pct = ((total - prevTotal) / prevTotal * 100).toFixed(1);
-      const color = parseFloat(pct) >= 0 ? 'var(--income)' : 'var(--danger)';
-      html += `<td style="${tdS(false,color)}">${parseFloat(pct)>=0?'+':''}${pct}%</td>`;
-    } else {
-      html += `<td style="${tdS(false,'var(--muted)')}">—</td>`;
-    }
-    prevTotal = total > 0 ? total : prevTotal;
+    if (prev && prev > 0 && total > 0) {
+      const pct = ((total-prev)/prev*100).toFixed(1);
+      const c = parseFloat(pct)>=0?'var(--income)':'var(--danger)';
+      html += `<td style="${tdS(false,c)}">${parseFloat(pct)>=0?'+':''}${pct}%</td>`;
+    } else html += `<td style="${tdS(false,'var(--muted)')}">—</td>`;
+    prev = total > 0 ? total : prev;
   });
   html += '</tr></tbody>';
 
   document.getElementById('historicTable').innerHTML = html;
+  loadSalaryFields();
+  calcSalary();
+}
+
+const HC_FIELDS = ['hc-vendes','hc-base','hc-basefija','hc-inc','hc-extras','hc-compct','hc-volobj','hc-volabs','hc-plusobj','hc-comu','hc-form','hc-desemp','hc-irpf','hc-mei','hc-solid'];
+const HC_DEFAULTS = {'hc-base':4909.5,'hc-basefija':1850.54,'hc-inc':166.67,'hc-extras':565.35,'hc-compct':0.25,'hc-volobj':1181632,'hc-volabs':323.48,'hc-comu':4.7,'hc-form':0.1,'hc-desemp':1.55,'hc-irpf':31.91,'hc-mei':0.13,'hc-solid':1.76};
+
+function loadSalaryFields() {
+  const saved = lsGet('salary_calc') || {};
+  HC_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (saved[id] !== undefined) el.value = saved[id];
+    else if (HC_DEFAULTS[id] !== undefined) el.value = HC_DEFAULTS[id];
+  });
+}
+
+function saveSalaryField(id) {
+  const saved = lsGet('salary_calc') || {};
+  const el = document.getElementById(id);
+  if (el) saved[id] = el.value;
+  lsSet('salary_calc', saved);
   calcSalary();
 }
 
@@ -2470,18 +2519,20 @@ function calcSalary() {
   const extras   = v('hc-extras');
   const compPct  = v('hc-compct');
   const volObj   = v('hc-volobj');
+  const volAbs   = v('hc-volabs');
   const plusObj  = v('hc-plusobj');
 
   // Comissió = vendes * compPct / 100
   const com = vendes * compPct / 100;
 
-  // Plus objectiu: si vendes >= volObj
-  const plus = vendes >= volObj ? plusObj : 0;
+  // Plus objectiu: si vendes >= volObj es calcula, sinó 0
+  // volAbs és el plus per superar l'objectiu de vendes absolut
+  const plus = vendes >= volObj ? (plusObj || volAbs) : 0;
 
-  // Total brut = base + inc + extras + com + plus
+  // Total brut
   const brut = baseFija + inc + extras + com + plus;
 
-  // Deductions (% of base de cotització or brut)
+  // Deduccions sobre base de cotització
   const comu   = v('hc-comu')   / 100 * base;
   const form   = v('hc-form')   / 100 * base;
   const desemp = v('hc-desemp') / 100 * base;
@@ -2492,19 +2543,18 @@ function calcSalary() {
   const totalDed = comu + form + desemp + irpf + mei + solid;
   const net = brut - totalDed;
 
-  // Update labels with amounts
+  // Labels
   const lbl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = '(' + fmtE(val) + ')'; };
-  lbl('hc-lbl-comu', comu); lbl('hc-lbl-form', form);
-  lbl('hc-lbl-desemp', desemp); lbl('hc-lbl-irpf', irpf); lbl('hc-lbl-mei', mei);
+  lbl('hc-lbl-comu',comu); lbl('hc-lbl-form',form);
+  lbl('hc-lbl-desemp',desemp); lbl('hc-lbl-irpf',irpf); lbl('hc-lbl-mei',mei);
 
-  const set = (id, val, color) => {
-    const el = document.getElementById(id);
-    if (el) { el.textContent = fmtE(val); if(color) el.style.color = color; }
-  };
-  set('hc-r-com',  com);
-  set('hc-r-brut', brut);
-  set('hc-r-ded',  totalDed, 'var(--danger)');
-  set('hc-r-net',  net, net >= 0 ? 'var(--income)' : 'var(--danger)');
+  // Results
+  const set = (id,val,color) => { const el=document.getElementById(id); if(el){el.textContent=fmtE(val);if(color)el.style.color=color;} };
+  set('hc-r-com',   com);
+  set('hc-r-plus',  plus);
+  set('hc-r-brut',  brut);
+  set('hc-r-ded',   totalDed, 'var(--danger)');
+  set('hc-r-net',   net, net>=0?'var(--income)':'var(--danger)');
 }
 
 function showTab(tab) {
