@@ -370,7 +370,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.6</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.7</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -2291,67 +2291,82 @@ function renderAnalysis() {
 // ============================================================
 // HISTORIC TAB
 // ============================================================
+const HIST_SEED = {}; // dades privades eliminades de l'historial
+
 function renderHistoric() {
-  const YEARS = getAvailableYears();
   const MONTHS_SHORT = ['Gen','Feb','Mar','Abr','Mai','Jun','Jul','Ago','Set','Oct','Nov','Des'];
 
-  // Build nomina data per month/year from expenses
-  const nomData = {};
-  MONTHS_SHORT.forEach((_, mi) => { nomData[mi] = {}; });
-  YEARS.forEach(yr => {
+  // Merge Excel seed data with live app data (app takes priority for 2021+)
+  const nomData = {}; // yr -> {mo: val}
+
+  // Start with seed data
+  Object.entries(HIST_SEED).forEach(([yr, months]) => {
+    const y = parseInt(yr);
+    nomData[y] = {...months};
+  });
+
+  // Override/add with live app data
+  const appYears = getAvailableYears();
+  appYears.forEach(yr => {
     for (let mo = 0; mo < 12; mo++) {
       const nom = getMonthData(yr, mo)
         .filter(e => getCat(e.cat).type === 'ingressos')
         .reduce((s, e) => s + Math.abs(e.amount), 0);
-      if (nom > 0) nomData[mo][yr] = nom;
+      if (nom > 0) {
+        if (!nomData[yr]) nomData[yr] = {};
+        nomData[yr][mo] = nom;
+      }
     }
   });
 
-  const thS = 'background:var(--surface2);padding:8px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-family:"DM Mono",monospace;white-space:nowrap;border:1px solid var(--border)';
-  const tdS = (bold, color) => `padding:7px 12px;border:1px solid var(--border);font-family:"DM Mono",monospace;font-size:12px;text-align:right;${bold?'font-weight:700;':''}${color?'color:'+color+';':''}`;
-  const tdL = 'padding:7px 10px;border:1px solid var(--border);font-size:12px;font-weight:600;white-space:nowrap';
+  // Get all years sorted
+  const YEARS = [...new Set([...Object.keys(HIST_SEED).map(Number), ...appYears])].sort((a,b)=>a-b);
+
+  const thS = 'background:var(--surface2);padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-family:"DM Mono",monospace;white-space:nowrap;border:1px solid var(--border)';
+  const tdS = (bold, color) => `padding:7px 10px;border:1px solid var(--border);font-family:"DM Mono",monospace;font-size:12px;text-align:right;${bold?'font-weight:700;':''}${color?'color:'+color+';':''}`;
+  const tdL = 'padding:7px 10px;border:1px solid var(--border);font-size:12px;font-weight:600;white-space:nowrap;background:var(--surface2)';
 
   let html = `<thead><tr>
-    <th style="${thS};text-align:left">Mes</th>
+    <th style="${thS};text-align:left;position:sticky;left:0">Mes</th>
     ${YEARS.map(y => `<th style="${thS}">${y}</th>`).join('')}
   </tr></thead><tbody>`;
 
   // Monthly rows
   MONTHS_SHORT.forEach((m, mi) => {
-    const vals = YEARS.map(yr => nomData[mi][yr] || 0);
+    const vals = YEARS.map(yr => (nomData[yr] || {})[mi] || 0);
     if (vals.every(v => v === 0)) return;
     html += `<tr>
-      <td style="${tdL}">${m}</td>
-      ${vals.map(v => `<td style="${tdS(false, '')}">${v ? fmtE(v) : '—'}</td>`).join('')}
+      <td style="${tdL};position:sticky;left:0">${m}</td>
+      ${vals.map(v => `<td style="${tdS(false,'')}">${v ? fmtE(v) : '—'}</td>`).join('')}
     </tr>`;
   });
 
   // Mitjana row
-  html += `<tr style="background:rgba(0,0,0,0.02)"><td style="${tdL}">Mitjana</td>`;
+  html += `<tr style="background:rgba(0,0,0,0.02)"><td style="${tdL};position:sticky;left:0">Mitjana</td>`;
   YEARS.forEach(yr => {
-    const vals = Object.values(nomData).map(m => m[yr]).filter(v => v > 0);
+    const vals = Object.values(nomData[yr]||{}).filter(v=>v>0);
     const avg = vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : 0;
     html += `<td style="${tdS(false,'var(--muted)')}">${avg ? fmtE(avg) : '—'}</td>`;
   });
   html += '</tr>';
 
   // Total net row
-  html += `<tr style="background:rgba(37,99,235,0.04)"><td style="${tdL};color:var(--accent)">Total net</td>`;
+  html += `<tr style="background:rgba(37,99,235,0.04)"><td style="${tdL};position:sticky;left:0;color:var(--accent)">Total net</td>`;
   YEARS.forEach(yr => {
-    const total = Object.values(nomData).reduce((s, m) => s + (m[yr]||0), 0);
+    const total = Object.values(nomData[yr]||{}).reduce((s,v)=>s+v,0);
     html += `<td style="${tdS(true,'var(--accent)')}">${total ? fmtE(total) : '—'}</td>`;
   });
   html += '</tr>';
 
   // % canvi row
-  html += `<tr><td style="${tdL};color:var(--muted)">% canvi</td>`;
+  html += `<tr><td style="${tdL};position:sticky;left:0;color:var(--muted)">% canvi</td>`;
   let prevTotal = null;
   YEARS.forEach(yr => {
-    const total = Object.values(nomData).reduce((s, m) => s + (m[yr]||0), 0);
+    const total = Object.values(nomData[yr]||{}).reduce((s,v)=>s+v,0);
     if (prevTotal && prevTotal > 0 && total > 0) {
       const pct = ((total - prevTotal) / prevTotal * 100).toFixed(1);
-      const color = pct >= 0 ? 'var(--income)' : 'var(--danger)';
-      html += `<td style="${tdS(false, color)}">${pct >= 0 ? '+' : ''}${pct}%</td>`;
+      const color = parseFloat(pct) >= 0 ? 'var(--income)' : 'var(--danger)';
+      html += `<td style="${tdS(false,color)}">${parseFloat(pct)>=0?'+':''}${pct}%</td>`;
     } else {
       html += `<td style="${tdS(false,'var(--muted)')}">—</td>`;
     }
