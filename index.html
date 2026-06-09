@@ -370,7 +370,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.8</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.9</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -530,16 +530,8 @@
           <input type="number" id="hc-compct" step="0.01" oninput="saveSalaryField('hc-compct')">
         </div>
         <div class="form-row">
-          <div class="form-label">Volum objectiu absolut (€)</div>
-          <input type="number" id="hc-volobj" step="1" oninput="saveSalaryField('hc-volobj')">
-        </div>
-        <div class="form-row">
-          <div class="form-label">Vol. abs (plus si s'assoleix objectiu) (€)</div>
+          <div class="form-label">Vol. abs — plus si s'assoleix objectiu (€)</div>
           <input type="number" id="hc-volabs" step="0.01" oninput="saveSalaryField('hc-volabs')">
-        </div>
-        <div class="form-row">
-          <div class="form-label">Plus objectiu addicional (€)</div>
-          <input type="number" id="hc-plusobj" step="0.01" oninput="saveSalaryField('hc-plusobj')">
         </div>
 
         <!-- Deductions -->
@@ -2444,7 +2436,7 @@ function renderHistoric() {
     YEARS.forEach(yr => {
       const val = (nomData[yr]||{})[mi];
       html += `<td style="${tdS(false,'')}"><input type="number"
-        style="width:80px;border:none;background:transparent;font-family:'DM Mono',monospace;font-size:12px;text-align:right;color:var(--text);-moz-appearance:textfield"
+        style="width:100px;border:none;background:transparent;font-family:'DM Mono',monospace;font-size:12px;text-align:right;color:var(--text);-moz-appearance:textfield"
         value="${val ? val.toFixed(2) : ''}"
         placeholder="—"
         onchange="histCellEdit(${yr},${mi},this.value)"
