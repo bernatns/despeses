@@ -370,7 +370,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.5</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v2.6</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -396,6 +396,7 @@
       <button onclick="showTab('categories')">Categories</button>
       <button onclick="showTab('merchants')">Comerços</button>
       <button onclick="showTab('analisi')">Anàlisi</button>
+      <button onclick="showTab('historic')">Historial</button>
     </nav>
   </div>
 </header>
@@ -484,6 +485,94 @@
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow-x:auto">
       <table class="analysis-table" id="analysis-table"></table>
     </div>
+  </div>
+</div>
+
+<!-- HISTORIC VIEW -->
+<div class="app" id="tab-historic">
+  <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+
+    <!-- Left: salary history table -->
+    <div style="flex:2;min-width:280px">
+      <div class="section-title" style="margin-bottom:16px">Historial de nòmines</div>
+      <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border)">
+        <table id="historicTable" style="width:100%;border-collapse:collapse;font-size:12px"></table>
+      </div>
+    </div>
+
+    <!-- Right: salary calculator -->
+    <div style="flex:1;min-width:280px;max-width:380px">
+      <div class="section-title" style="margin-bottom:16px">Calculador de sou</div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px">
+
+        <div class="form-row">
+          <div class="form-label">Vendes del mes (€)</div>
+          <input type="number" id="hc-vendes" step="0.01" placeholder="0.00" oninput="calcSalary()">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Base de cotització (€)</div>
+          <input type="number" id="hc-base" step="0.01" value="4909.5" oninput="calcSalary()">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Base (sou fix) (€)</div>
+          <input type="number" id="hc-basefija" step="0.01" value="1850.54" oninput="calcSalary()">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Increment (€)</div>
+          <input type="number" id="hc-inc" step="0.01" value="166.67" oninput="calcSalary()">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Extras (€)</div>
+          <input type="number" id="hc-extras" step="0.01" value="565.35" oninput="calcSalary()">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Comissió per vendes (%)</div>
+          <input type="number" id="hc-compct" step="0.01" value="0.25" oninput="calcSalary()">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Volum objectiu (€)</div>
+          <input type="number" id="hc-volobj" step="1" value="1181632" oninput="calcSalary()">
+        </div>
+        <div class="form-row">
+          <div class="form-label">Plus objectiu (€)</div>
+          <input type="number" id="hc-plusobj" step="0.01" value="0" oninput="calcSalary()">
+        </div>
+
+        <!-- Deductions -->
+        <div style="border-top:1px solid var(--border);margin:14px 0;padding-top:10px">
+          <div style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:10px">Deduccions</div>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:6px;font-size:12px">
+            <span style="color:var(--muted)">Cont. comuni. <span id="hc-lbl-comu"></span></span>
+            <input type="number" id="hc-comu" step="0.01" value="4.7" style="width:70px;text-align:right" oninput="calcSalary()">
+            <span style="color:var(--muted)">Formació <span id="hc-lbl-form"></span></span>
+            <input type="number" id="hc-form" step="0.01" value="0.1" style="width:70px;text-align:right" oninput="calcSalary()">
+            <span style="color:var(--muted)">Desocupació <span id="hc-lbl-desemp"></span></span>
+            <input type="number" id="hc-desemp" step="0.01" value="1.55" style="width:70px;text-align:right" oninput="calcSalary()">
+            <span style="color:var(--muted)">IRPF <span id="hc-lbl-irpf"></span></span>
+            <input type="number" id="hc-irpf" step="0.01" value="31.91" style="width:70px;text-align:right" oninput="calcSalary()">
+            <span style="color:var(--muted)">MEI <span id="hc-lbl-mei"></span></span>
+            <input type="number" id="hc-mei" step="0.01" value="0.13" style="width:70px;text-align:right" oninput="calcSalary()">
+            <span style="color:var(--muted)">Solidaritat</span>
+            <input type="number" id="hc-solid" step="0.01" value="1.76" style="width:70px;text-align:right" oninput="calcSalary()">
+          </div>
+        </div>
+
+        <!-- Results -->
+        <div style="border-top:2px solid var(--border);margin-top:14px;padding-top:14px">
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;font-size:13px">
+            <span style="color:var(--muted)">Comissió</span>
+            <span id="hc-r-com" style="font-family:'DM Mono',monospace;text-align:right;font-weight:600"></span>
+            <span style="color:var(--muted)">Total brut</span>
+            <span id="hc-r-brut" style="font-family:'DM Mono',monospace;text-align:right;font-weight:600"></span>
+            <span style="color:var(--muted)">Total deduccions</span>
+            <span id="hc-r-ded" style="font-family:'DM Mono',monospace;text-align:right;color:var(--danger)"></span>
+            <span style="font-weight:700;font-size:15px">NET</span>
+            <span id="hc-r-net" style="font-family:'DM Mono',monospace;text-align:right;font-weight:700;font-size:18px;color:var(--income)"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -2271,18 +2360,140 @@ function renderAnalysis() {
   document.getElementById('analysis-table').innerHTML = tableHtml;
 }
 
+// ============================================================
+// HISTORIC TAB
+// ============================================================
+function renderHistoric() {
+  const YEARS = getAvailableYears();
+  const MONTHS_SHORT = ['Gen','Feb','Mar','Abr','Mai','Jun','Jul','Ago','Set','Oct','Nov','Des'];
+
+  // Build nomina data per month/year from expenses
+  const nomData = {};
+  MONTHS_SHORT.forEach((_, mi) => { nomData[mi] = {}; });
+  YEARS.forEach(yr => {
+    for (let mo = 0; mo < 12; mo++) {
+      const nom = getMonthData(yr, mo)
+        .filter(e => getCat(e.cat).type === 'ingressos')
+        .reduce((s, e) => s + Math.abs(e.amount), 0);
+      if (nom > 0) nomData[mo][yr] = nom;
+    }
+  });
+
+  const thS = 'background:var(--surface2);padding:8px 12px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-family:"DM Mono",monospace;white-space:nowrap;border:1px solid var(--border)';
+  const tdS = (bold, color) => `padding:7px 12px;border:1px solid var(--border);font-family:"DM Mono",monospace;font-size:12px;text-align:right;${bold?'font-weight:700;':''}${color?'color:'+color+';':''}`;
+  const tdL = 'padding:7px 10px;border:1px solid var(--border);font-size:12px;font-weight:600;white-space:nowrap';
+
+  let html = `<thead><tr>
+    <th style="${thS};text-align:left">Mes</th>
+    ${YEARS.map(y => `<th style="${thS}">${y}</th>`).join('')}
+  </tr></thead><tbody>`;
+
+  // Monthly rows
+  MONTHS_SHORT.forEach((m, mi) => {
+    const vals = YEARS.map(yr => nomData[mi][yr] || 0);
+    if (vals.every(v => v === 0)) return;
+    html += `<tr>
+      <td style="${tdL}">${m}</td>
+      ${vals.map(v => `<td style="${tdS(false, '')}">${v ? fmtE(v) : '—'}</td>`).join('')}
+    </tr>`;
+  });
+
+  // Mitjana row
+  html += `<tr style="background:rgba(0,0,0,0.02)"><td style="${tdL}">Mitjana</td>`;
+  YEARS.forEach(yr => {
+    const vals = Object.values(nomData).map(m => m[yr]).filter(v => v > 0);
+    const avg = vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : 0;
+    html += `<td style="${tdS(false,'var(--muted)')}">${avg ? fmtE(avg) : '—'}</td>`;
+  });
+  html += '</tr>';
+
+  // Total net row
+  html += `<tr style="background:rgba(37,99,235,0.04)"><td style="${tdL};color:var(--accent)">Total net</td>`;
+  YEARS.forEach(yr => {
+    const total = Object.values(nomData).reduce((s, m) => s + (m[yr]||0), 0);
+    html += `<td style="${tdS(true,'var(--accent)')}">${total ? fmtE(total) : '—'}</td>`;
+  });
+  html += '</tr>';
+
+  // % canvi row
+  html += `<tr><td style="${tdL};color:var(--muted)">% canvi</td>`;
+  let prevTotal = null;
+  YEARS.forEach(yr => {
+    const total = Object.values(nomData).reduce((s, m) => s + (m[yr]||0), 0);
+    if (prevTotal && prevTotal > 0 && total > 0) {
+      const pct = ((total - prevTotal) / prevTotal * 100).toFixed(1);
+      const color = pct >= 0 ? 'var(--income)' : 'var(--danger)';
+      html += `<td style="${tdS(false, color)}">${pct >= 0 ? '+' : ''}${pct}%</td>`;
+    } else {
+      html += `<td style="${tdS(false,'var(--muted)')}">—</td>`;
+    }
+    prevTotal = total > 0 ? total : prevTotal;
+  });
+  html += '</tr></tbody>';
+
+  document.getElementById('historicTable').innerHTML = html;
+  calcSalary();
+}
+
+function calcSalary() {
+  const v = n => parseFloat(document.getElementById(n)?.value) || 0;
+  const vendes   = v('hc-vendes');
+  const base     = v('hc-base');
+  const baseFija = v('hc-basefija');
+  const inc      = v('hc-inc');
+  const extras   = v('hc-extras');
+  const compPct  = v('hc-compct');
+  const volObj   = v('hc-volobj');
+  const plusObj  = v('hc-plusobj');
+
+  // Comissió = vendes * compPct / 100
+  const com = vendes * compPct / 100;
+
+  // Plus objectiu: si vendes >= volObj
+  const plus = vendes >= volObj ? plusObj : 0;
+
+  // Total brut = base + inc + extras + com + plus
+  const brut = baseFija + inc + extras + com + plus;
+
+  // Deductions (% of base de cotització or brut)
+  const comu   = v('hc-comu')   / 100 * base;
+  const form   = v('hc-form')   / 100 * base;
+  const desemp = v('hc-desemp') / 100 * base;
+  const irpf   = v('hc-irpf')   / 100 * brut;
+  const mei    = v('hc-mei')    / 100 * base;
+  const solid  = v('hc-solid');
+
+  const totalDed = comu + form + desemp + irpf + mei + solid;
+  const net = brut - totalDed;
+
+  // Update labels with amounts
+  const lbl = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = '(' + fmtE(val) + ')'; };
+  lbl('hc-lbl-comu', comu); lbl('hc-lbl-form', form);
+  lbl('hc-lbl-desemp', desemp); lbl('hc-lbl-irpf', irpf); lbl('hc-lbl-mei', mei);
+
+  const set = (id, val, color) => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = fmtE(val); if(color) el.style.color = color; }
+  };
+  set('hc-r-com',  com);
+  set('hc-r-brut', brut);
+  set('hc-r-ded',  totalDed, 'var(--danger)');
+  set('hc-r-net',  net, net >= 0 ? 'var(--income)' : 'var(--danger)');
+}
+
 function showTab(tab) {
   console.log('showTab:', tab);
   document.querySelectorAll('.app').forEach(a=>a.classList.remove('visible'));
   document.getElementById('tab-'+tab).classList.add('visible');
   document.querySelectorAll('nav button').forEach((b,i)=>{
-    b.classList.toggle('active', ['mes','anual','grafics','categories','merchants','analisi'][i]===tab);
+    b.classList.toggle('active', ['mes','anual','grafics','categories','merchants','analisi','historic'][i]===tab);
   });
   if(tab==='anual') renderAnnual();
   else if(tab==='grafics') renderCharts();
   else if(tab==='categories') renderCategories();
   else if(tab==='merchants') renderMerchants();
   else if(tab==='analisi') renderAnalysis();
+  else if(tab==='historic') renderHistoric();
 }
 
 function selectMonth(m) {
@@ -2298,7 +2509,7 @@ function onYearChange() {
   renderMonthTabs();
   renderCards();
   renderTable();
-  const tabs = ['mes','anual','grafics','categories','merchants','analisi'];
+  const tabs = ['mes','anual','grafics','categories','merchants','analisi','historic'];
   const activeBtn = document.querySelector('nav button.active');
   const idx = [...document.querySelectorAll('nav button')].indexOf(activeBtn);
   const tab = tabs[idx];
