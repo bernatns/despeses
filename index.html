@@ -370,7 +370,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v3.7</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v3.8</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -1266,8 +1266,11 @@ async function loadUserSettings() {
   if (error) { console.error('loadUserSettings:', error.message); return; }
   _settingsCache = {};
   (data||[]).forEach(r => { _settingsCache[r.key] = r.value; });
-  // Also write to localStorage as fast cache
-  Object.entries(_settingsCache).forEach(([k,v]) => lsSet(k, v));
+  // Always overwrite localStorage with Supabase data (Supabase is source of truth)
+  SB_SETTINGS_KEYS.forEach(k => {
+    if (_settingsCache[k] !== undefined) lsSet(k, _settingsCache[k]);
+    else localStorage.removeItem(k); // clear stale local data
+  });
 }
 
 async function sbSettingSet(key, val) {
