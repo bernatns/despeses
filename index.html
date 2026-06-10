@@ -370,7 +370,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v3.6</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v3.7</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -1252,9 +1252,36 @@ async function delMerchant(name) {
   if (currentUser) await sb.from('merchants').delete().eq('merchant_name', name).eq('user_id', currentUser.id);
 }
 
-// localStorage only used for offline cache / formats
+// localStorage for offline cache / formats / non-user-specific data
 function lsGet(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch(e) { return null; } }
 function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch(e) { return false; } }
+
+// Supabase user settings (synced across devices)
+const SB_SETTINGS_KEYS = ['hist_edits','hist_brut','hist_previews','salary_calc'];
+let _settingsCache = {};
+
+async function loadUserSettings() {
+  if (!currentUser) return;
+  const { data, error } = await sb.from('user_settings').select('key,value').eq('user_id', currentUser.id);
+  if (error) { console.error('loadUserSettings:', error.message); return; }
+  _settingsCache = {};
+  (data||[]).forEach(r => { _settingsCache[r.key] = r.value; });
+  // Also write to localStorage as fast cache
+  Object.entries(_settingsCache).forEach(([k,v]) => lsSet(k, v));
+}
+
+async function sbSettingSet(key, val) {
+  _settingsCache[key] = val;
+  lsSet(key, val); // fast local cache
+  if (!currentUser) return;
+  await sb.from('user_settings').upsert({ user_id: currentUser.id, key, value: val });
+}
+
+function sbSettingGet(key) {
+  // Use cache first (already loaded from Supabase on login)
+  if (_settingsCache[key] !== undefined) return _settingsCache[key];
+  return lsGet(key); // fallback to localStorage
+}
 Object.defineProperty(window, 'LS_EXPENSES',  { get: () => 'desp_expenses' });
 Object.defineProperty(window, 'LS_CATS',      { get: () => 'desp_categories' });
 Object.defineProperty(window, 'LS_MERCHANTS', { get: () => 'desp_merchants' });
@@ -2376,7 +2403,7 @@ const HIST_SEED = {
 
 function getHistoricData() {
   // Load user edits from localStorage
-  const edits = lsGet('hist_edits') || {};
+  const edits = sbSettingGet('hist_edits') || {};
   const nomData = {};
   // Seed data
   Object.entries(HIST_SEED).forEach(([yr, months]) => {
@@ -2401,13 +2428,13 @@ function getHistoricData() {
   return nomData;
 }
 
-function histCellEdit(yr, mo, val) {
-  const edits = lsGet('hist_edits') || {};
+async function histCellEdit(yr, mo, val) {
+  const edits = sbSettingGet('hist_edits') || {};
   const key = `${yr}-${mo}`;
   const parsed = parseFloat(val);
   if (!val || isNaN(parsed)) delete edits[key];
   else edits[key] = parsed;
-  lsSet('hist_edits', edits);
+  await sbSettingSet('hist_edits', edits);
   renderHistoric();
 }
 
@@ -2421,8 +2448,8 @@ function renderHistoric() {
   const YEARS = [...new Set(allYears)].sort((a,b)=>a-b);
 
   // Load preview flags and brut values
-  const previews = lsGet('hist_previews') || {};  // key: "yr-mo" -> true
-  const brutVals = lsGet('hist_brut') || {};       // key: "yr" -> value
+  const previews = sbSettingGet('hist_previews') || {};  // key: "yr-mo" -> true
+  const brutVals = sbSettingGet('hist_brut') || {};       // key: "yr" -> value
 
   const thS = 'background:var(--surface2);padding:8px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);font-family:"DM Mono",monospace;white-space:nowrap;border:1px solid var(--border)';
   const tdS = (bold,color,bg) => `padding:4px 6px;border:1px solid var(--border);font-family:"DM Mono",monospace;font-size:12px;text-align:right;${bold?'font-weight:700;':''}${color?'color:'+color+';':''}${bg?'background:'+bg+';':''}`;
@@ -2518,27 +2545,27 @@ function renderHistoric() {
   calcSalary();
 }
 
-function histTogglePreview(yr, mo, input) {
+async function histTogglePreview(yr, mo, input) {
   const previews = lsGet('hist_previews') || {};
   const key = `${yr}-${mo}`;
   if (previews[key]) delete previews[key];
   else previews[key] = true;
-  lsSet('hist_previews', previews);
+  await sbSettingSet('hist_previews', previews);
   renderHistoric();
 }
 
-function histBrutEdit(yr, val) {
-  const brutVals = lsGet('hist_brut') || {};
+async function histBrutEdit(yr, val) {
+  const brutVals = sbSettingGet('hist_brut') || {};
   if (!val || isNaN(parseFloat(val))) delete brutVals[yr];
   else brutVals[yr] = parseFloat(val);
-  lsSet('hist_brut', brutVals);
+  await sbSettingSet('hist_brut', brutVals);
 }
 
 const HC_FIELDS = ['hc-vendes','hc-base','hc-basefija','hc-inc','hc-extras','hc-compct','hc-volobj','hc-volabs','hc-plusobj','hc-comu','hc-form','hc-desemp','hc-irpf','hc-mei','hc-solid'];
 const HC_DEFAULTS = {'hc-base':4909.5,'hc-basefija':1850.54,'hc-inc':166.67,'hc-extras':565.35,'hc-compct':0.25,'hc-volobj':1181632,'hc-volabs':323.48,'hc-comu':4.7,'hc-form':0.1,'hc-desemp':1.55,'hc-irpf':31.91,'hc-mei':0.13,'hc-solid':1.76};
 
 function loadSalaryFields() {
-  const saved = lsGet('salary_calc') || {};
+  const saved = sbSettingGet('salary_calc') || {};
   HC_FIELDS.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -2547,11 +2574,11 @@ function loadSalaryFields() {
   });
 }
 
-function saveSalaryField(id) {
-  const saved = lsGet('salary_calc') || {};
+async function saveSalaryField(id) {
+  const saved = sbSettingGet('salary_calc') || {};
   const el = document.getElementById(id);
   if (el) saved[id] = el.value;
-  lsSet('salary_calc', saved);
+  await sbSettingSet('salary_calc', saved);
   calcSalary();
 }
 
@@ -3527,6 +3554,7 @@ async function onAuthChange(session) {
 
     try {
       await loadAll();
+      await loadUserSettings();
       clearTimeout(timeout);
       state.month = new Date().getMonth();
       updateUserNameBtn();
