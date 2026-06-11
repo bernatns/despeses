@@ -370,7 +370,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v3.9</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v4.0</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -3086,17 +3086,23 @@ function openImportModal() {
 }
 
 function isDateLine(s) {
-  return /^\d{1,2}\s+de\s+\w+/i.test(s) ||   // "06 de junio"
-         /^\d{2}\/\d{2}(\/\d{2,4})?$/.test(s) || // "03/06" or "03/06/2025"
-         /^\d{4}-\d{2}-\d{2}$/.test(s);          // "2025-06-03"
+  const n = s.replace(/[\u00A0\u200B\u2009\u202F\uFEFF]/g,' ').trim();
+  return /^\d{1,2}\s+de\s+\w+/i.test(n) ||
+         /^\d{2}\/\d{2}(\/\d{2,4})?$/.test(n) ||
+         /^\d{4}-\d{2}-\d{2}$/.test(n);
 }
-function isAmountLine(s) { return /^-?[\d.,]+\s*€/.test(s); }
+function isAmountLine(s) {
+  // Normalize: remove invisible chars, non-breaking spaces, etc.
+  const n = s.replace(/[\u00A0\u200B\u2009\u202F\uFEFF]/g,' ').trim();
+  return /^-?[\d.,]+\s*[€E]/.test(n) || /^-?[\d.,]+\s*EUR/i.test(n);
+}
 function parseDay(s) {
   const m = s.match(/^(\d{1,2})\s+de/i) || s.match(/^(\d{2})\//);
   return m ? parseInt(m[1]) : null;
 }
 function parseAmount(s) {
-  const m = s.match(/(-?[\d.,]+)\s*€/);
+  const n = s.replace(/[\u00A0\u200B\u2009\u202F\uFEFF]/g,' ').trim();
+  const m = n.match(/(-?[\d.,]+)\s*[€E]/);
   if (!m) return null;
   return parseFloat(m[1].replace(/\./g,'').replace(',','.'));
 }
