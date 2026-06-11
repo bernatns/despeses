@@ -370,7 +370,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v4.5</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v4.6</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -1153,11 +1153,22 @@ async function loadAll() {
   merchants = {};
   (merch || []).forEach(r => { merchants[r.merchant_name] = { cat: r.cat, count: r.count }; });
 
-  // Expenses
-  const { data: exps, error: expsErr } = await sb.from('expenses').select('*').eq('user_id', uid);
-  if (expsErr) throw new Error('expenses: ' + expsErr.message);
+  // Expenses — paginated load to bypass 1000-row default limit
   expenses = {};
-  (exps || []).forEach(e => {
+  let allExps = [];
+  let from = 0;
+  const PAGE = 1000;
+  while (true) {
+    const { data: page, error: pgErr } = await sb.from('expenses')
+      .select('*').eq('user_id', uid)
+      .range(from, from + PAGE - 1);
+    if (pgErr) throw new Error('expenses: ' + pgErr.message);
+    if (!page || page.length === 0) break;
+    allExps = allExps.concat(page);
+    if (page.length < PAGE) break;
+    from += PAGE;
+  }
+  (allExps).forEach(e => {
     const yr = parseInt(e.year), mo = parseInt(e.month);
     if (!expenses[yr]) expenses[yr] = {};
     if (!expenses[yr][mo]) expenses[yr][mo] = [];
