@@ -370,7 +370,7 @@
 <div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v4.6</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v4.7</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
@@ -440,6 +440,7 @@
     <table style="width:100%;min-width:480px;border-collapse:collapse">
       <thead>
         <tr id="expenseTableHead">
+          <th style="background:var(--surface2);padding:11px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;cursor:pointer;user-select:none" onclick="sortTable('day')">Dia <span id="sort-day"></span></th>
           <th style="background:var(--surface2);padding:11px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;cursor:pointer;user-select:none" onclick="sortTable('cat')">Categoria <span id="sort-cat"></span></th>
           <th style="background:var(--surface2);padding:11px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;cursor:pointer;user-select:none" onclick="sortTable('amount')">Import <span id="sort-amount"></span></th>
           <th style="background:var(--surface2);padding:11px 16px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;cursor:pointer;user-select:none" onclick="sortTable('type')">Tipus <span id="sort-type"></span></th>
@@ -1575,7 +1576,7 @@ function sortTable(col) {
 }
 
 function applySortIndicators() {
-  ['cat','amount','type','notes'].forEach(col => {
+  ['day','cat','amount','type','notes'].forEach(col => {
     const el = document.getElementById('sort-' + col);
     if (!el) return;
     if (state.sortCol === col) {
@@ -1600,6 +1601,7 @@ function renderTable() {
   if (state.sortCol) {
     const sortFn = (a, b) => {
       let va, vb;
+      if (state.sortCol === 'day')    { va = a.day||0; vb = b.day||0; }
       if (state.sortCol === 'cat')    { va = getCat(a.cat).name; vb = getCat(b.cat).name; }
       if (state.sortCol === 'amount') { va = Math.abs(a.amount); vb = Math.abs(b.amount); }
       if (state.sortCol === 'type')   { va = getCat(a.cat).type; vb = getCat(b.cat).type; }
@@ -1611,7 +1613,7 @@ function renderTable() {
   }
 
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">Cap entrada per aquest mes</div></td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6"><div class="empty-state">Cap entrada per aquest mes</div></td></tr>`;
     return;
   }
 
@@ -1624,6 +1626,7 @@ function renderTable() {
         ? `<span class="fixed-tag">fixa</span>`
         : `<span style="color:var(--muted);font-size:11px">var.</span>`;
     return `<tr class="${e.pending?'is-pending':''}">
+      <td style="color:var(--muted);font-family:'DM Mono',monospace;font-size:12px">${e.day||'—'}</td>
       <td><span class="cat-badge cat-badge-link" onclick="openDetail('${e.cat}',${state.month},${state.year})" title="Veure detall">${cat.name}</span>${e.pending?'<span class="pending-badge">no compta</span>':''}</td>
       <td class="amount-cell" style="color:${isIncome?'var(--income)':''}">
         ${isIncome?'+':''}${fmtE(Math.abs(e.amount))}</td>
