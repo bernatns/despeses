@@ -1726,11 +1726,18 @@ async function confirmBackupMerge() {
   }
 
   // Settings: merge objects, current values win
+  const SETTING_NAMES = { hist_seed:'nòmines antigues', hist_edits:"edicions de l'historial", hist_brut:'brut anual', hist_previews:'previsions', salary_calc:'calculadora de sou', budgets:'pressupostos' };
+  const restoredSettings = [];
   for (const [k, v] of Object.entries(backup.settings || {})) {
     if (!SB_SETTINGS_KEYS.includes(k) || k === 'cat_order') continue;
     const cur = sbSettingGet(k);
-    if (cur == null) await sbSettingSet(k, v);
-    else if (typeof cur === 'object' && typeof v === 'object' && !Array.isArray(cur)) await sbSettingSet(k, { ...v, ...cur });
+    let next = null;
+    if (cur == null) next = v;
+    else if (typeof cur === 'object' && typeof v === 'object' && !Array.isArray(cur)) next = { ...v, ...cur };
+    if (next !== null && JSON.stringify(next) !== JSON.stringify(cur)) {
+      await sbSettingSet(k, next);
+      if (SETTING_NAMES[k]) restoredSettings.push(SETTING_NAMES[k]);
+    }
   }
 
   btn.textContent = 'Carregant dades...';
@@ -1741,7 +1748,8 @@ async function confirmBackupMerge() {
   btn.disabled = false;
   btn.textContent = 'Combinar i restaurar';
   refreshViews();
-  showToast(`${ins.inserted.length} entrades importades` + (ins.dupRecs.size ? ` · ${ins.dupRecs.size} ja existien i s'han saltat` : '') + '!');
+  showToast(`${ins.inserted.length} entrades importades` + (ins.dupRecs.size ? ` · ${ins.dupRecs.size} ja existien i s'han saltat` : '') +
+    (restoredSettings.length ? ` · configuració restaurada: ${restoredSettings.join(', ')}` : ''));
   _pendingBackup = null;
 }
 
