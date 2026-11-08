@@ -32,3 +32,13 @@ Aplicació web (PWA) per portar les despeses personals. Un sol `index.html` + Su
 | `manifest.webmanifest`, `icon-*.png` | PWA |
 | `supabase/migracio.sql` | Migració i regles d'accés |
 | `test.html` | Pàgina de diagnòstic de connexió a Supabase |
+
+## Pendents
+
+- **Neteja final de dades privades a GitHub (opcional).** El 8/11/2026 es va reescriure l'historial
+  de Git per treure'n nòmines i dades personals; les branques ja estan netes. GitHub, però,
+  conserva còpies dels commits antics (vistes en memòria cau i la PR #1). Per eliminar-les:
+  demanar-ho a GitHub Support (support.github.com/contact → "Remove sensitive data / cached views"),
+  o bé esborrar i tornar a crear el repositori amb l'historial net (cal tornar a configurar GitHub Pages).
+- Qualsevol còpia local del repo descarregada abans del 8/11/2026 s'ha d'esborrar i tornar a clonar
+  (si no, un push en tornaria a pujar l'historial antic).
