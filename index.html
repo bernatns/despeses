@@ -1336,6 +1336,7 @@ async function addExpense(rec) {
   const { data, error } = await sb.from('expenses').insert({
     user_id: currentUser.id, ...expenseRow(rec)
   }).select().single();
+  _lastWriteWasDup = isDupError(error);
   if (error || !data) { console.error(error); return null; }
   const e = rowToExpense(data);
   pushExpenseLocal(e);
@@ -1347,11 +1348,40 @@ async function updateExpense(id, rec) {
   if (!currentUser || !canWrite()) return false;
   const numId = Number(id);
   const { data, error } = await sb.from('expenses').update(expenseRow(rec)).eq('id', numId).eq('user_id', currentUser.id).select();
+  _lastWriteWasDup = isDupError(error);
   if (error || !data || !data.length) { console.error(error); return false; }
   removeExpenseLocal(numId);
   pushExpenseLocal(rowToExpense(data[0]));
   return true;
 }
+
+// Supabase has a unique constraint ("expenses_unique") that rejects identical entries.
+// Insert in batches; if a batch hits it, retry that batch row by row and skip only the
+// duplicates. Returns { inserted: [{row, rec}], dupRecs: Set(rec), error }.
+const isDupError = e => e && (e.code === '23505' || /duplicate key/i.test(e.message || ''));
+async function insertExpenseRows(recs, onProgress) {
+  const inserted = [], dupRecs = new Set();
+  let error = null;
+  for (let i = 0; i < recs.length && !error; i += 200) {
+    const chunk = recs.slice(i, i + 200);
+    const { data, error: e } = await sb.from('expenses').insert(chunk).select();
+    if (!e) {
+      (data || []).forEach((row, k) => inserted.push({ row, rec: chunk[k] }));
+    } else if (isDupError(e)) {
+      for (const rec of chunk) {
+        const res = await sb.from('expenses').insert(rec).select();
+        if (isDupError(res.error)) { dupRecs.add(rec); continue; }
+        if (res.error) { error = res.error; break; }
+        inserted.push({ row: res.data[0], rec });
+      }
+    } else {
+      error = e;
+    }
+    if (onProgress) onProgress(Math.min(i + chunk.length, recs.length), recs.length);
+  }
+  return { inserted, dupRecs, error };
+}
+let _lastWriteWasDup = false;
 
 // Delete one expense in Supabase and in memory. Returns true on success.
 async function removeExpense(id) {
@@ -1673,13 +1703,10 @@ async function confirmBackupMerge() {
     cat: e.cat, amount: Math.abs(parseFloat(e.amount)), notes: e.notes||'', pending: !!e.pending,
     ...(hasRefundCol ? { refund: !!e.refund } : {})
   }));
-  for (let i = 0; i < expRows.length; i += BATCH) {
-    btn.textContent = `Important despeses ${i}/${expRows.length}...`;
-    const { error } = await sb.from('expenses').insert(expRows.slice(i, i + BATCH));
-    if (error) {
-      await loadAll(); refreshViews();
-      return fail(error.message + ` (s'han importat ${i} de ${expRows.length})`);
-    }
+  const ins = await insertExpenseRows(expRows, (n, tot) => { btn.textContent = `Important despeses ${n}/${tot}...`; });
+  if (ins.error) {
+    await loadAll(); refreshViews();
+    return fail(ins.error.message + ` (s'han importat ${ins.inserted.length} de ${expRows.length})`);
   }
 
   // Merchants: only the ones we don't know yet
@@ -1714,7 +1741,7 @@ async function confirmBackupMerge() {
   btn.disabled = false;
   btn.textContent = 'Combinar i restaurar';
   refreshViews();
-  showToast(`${expRows.length} entrades importades!`);
+  showToast(`${ins.inserted.length} entrades importades` + (ins.dupRecs.size ? ` · ${ins.dupRecs.size} ja existien i s'han saltat` : '') + '!');
   _pendingBackup = null;
 }
 
@@ -3039,7 +3066,12 @@ Vols afegir-la igualment?`)) return;
   _savingExpense = true;
   try {
     const ok = editingId ? await updateExpense(editingId, rec) : !!(await addExpense(rec));
-    if (!ok) { showToast('Error guardant. Torna-ho a provar.', 'error'); return; }
+    if (!ok) {
+      showToast(_lastWriteWasDup
+        ? 'Ja existeix un apunt idèntic (mateix mes, dia, categoria i import). Canvia el dia o les notes.'
+        : 'Error guardant. Torna-ho a provar.', 'error');
+      return;
+    }
     state.editingId = null;
     closeModal('expenseModal');
     refreshViews();
@@ -3644,23 +3676,22 @@ async function doConfirmImport() {
   }
 
   // One batched insert instead of one request per line
+  // Batched insert; entries the database rejects as identical are skipped one by one
+  const ins = await insertExpenseRows(toInsert.map(x => x.rec));
+  const insertedRecs = new Set(ins.inserted.map(x => x.rec));
+  ins.inserted.forEach(x => pushExpenseLocal(rowToExpense(x.row)));
   let saved = 0;
-  for (let k = 0; k < toInsert.length; k += 200) {
-    const chunk = toInsert.slice(k, k + 200);
-    const { data, error } = await sb.from('expenses').insert(chunk.map(x => x.rec)).select();
-    if (error) {
-      showToast('Error important: ' + error.message + (saved ? ` (${saved} ja guardades)` : ''), 'error');
-      chunk.concat(toInsert.slice(k + 200)).forEach(x => { rowStatus[x.idx] = 'error'; });
-      break;
-    }
-    (data || []).forEach(row => pushExpenseLocal(rowToExpense(row)));
-    chunk.forEach(x => {
+  toInsert.forEach(x => {
+    if (insertedRecs.has(x.rec)) {
+      saved++;
       const m = importedRows[x.idx].merchant;
       merchants[m] = { cat: x.rec.cat, count: (merchants[m]?.count || 0) + 1 };
       touchedMerchants.add(m);
-    });
-    saved += chunk.length;
-  }
+    } else {
+      rowStatus[x.idx] = ins.dupRecs.has(x.rec) ? 'dup_db' : 'error';
+    }
+  });
+  if (ins.error) showToast('Error important: ' + ins.error.message + (saved ? ` (${saved} ja guardades)` : ''), 'error');
   await saveMerchants([...touchedMerchants]);
   refreshViews();
 
@@ -3671,8 +3702,8 @@ async function doConfirmImport() {
   const actionsEl = document.getElementById('importActions');
   const confirmBtn = document.getElementById('confirmImportBtn');
 
-  const statusColors = { imported: 'var(--income)', dup: 'var(--danger)', skipped_manual: 'var(--muted)', error: 'var(--danger)' };
-  const statusLabels = { imported: '✓ Importada', dup: '⚠ Duplicada', skipped_manual: '⊘ Ignorada', error: '✗ Error' };
+  const statusColors = { imported: 'var(--income)', dup: 'var(--danger)', dup_db: 'var(--danger)', skipped_manual: 'var(--muted)', error: 'var(--danger)' };
+  const statusLabels = { imported: '✓ Importada', dup: '⚠ Duplicada', dup_db: '⚠ Ja existeix (idèntica)', skipped_manual: '⊘ Ignorada', error: '✗ Error' };
 
   rowStatus.forEach((status, i) => {
     const row = document.getElementById(`review-${i}`);
@@ -3801,7 +3832,7 @@ async function importDupRow() {
   r._forceImport = true;
 
   const newId = await addExpense({ year: r.year, month: r.month, day: r.day||null, cat, amount: Math.abs(r.amount), notes, refund: isRefundRow(r, cat) });
-  if (!newId) { r._forceImport = false; showToast('Error en guardar', 'error'); return; }
+  if (!newId) { r._forceImport = false; showToast(_lastWriteWasDup ? 'La base de dades no permet un apunt idèntic a un que ja existeix' : 'Error en guardar', 'error'); return; }
   const existing = merchants[r.merchant];
   await putMerchant({ name: r.merchant, cat, count: (existing?.count || 0) + 1 });
   refreshViews();
