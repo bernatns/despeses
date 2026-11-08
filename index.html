@@ -7,13 +7,18 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Despeses">
-<meta name="theme-color" content="#ffffff">
-<link rel="manifest" id="pwa-manifest">
+<meta name="theme-color" content="#ffffff" id="meta-theme-color">
+<link rel="manifest" href="manifest.webmanifest">
 <title>Despeses</title>
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Versió fixada + integritat: una actualització automàtica de la llibreria no pot trencar l'app -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script>
+  // Apply the saved theme before first paint (auto | light | dark)
+  (function(){ try { var th = localStorage.getItem('desp_theme'); if (th === 'light' || th === 'dark') document.documentElement.setAttribute('data-theme', th); } catch(e) {} })();
+</script>
 <style>
   /* LOGIN */
   #loginScreen {
@@ -44,6 +49,34 @@
     --text: #111827;
     --muted: #6b7280;
     --income: #16a34a;
+    --orange: #f5a060;
+    --row-alt: rgba(0,0,0,0.02);
+    --warn-bg: #fef9c3;
+    --warn-text: #713f12;
+    --warn-border: #fde047;
+    --err-bg: #fee2e2;
+    --zero-line: #94a3b8;
+    --shadow: rgba(0,0,0,0.12);
+    color-scheme: light;
+  }
+  /* DARK MODE: follows the system unless the user forced light; or forced dark */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #0f1115; --surface: #171a21; --surface2: #1f232c; --border: #2c313c;
+      --accent: #5b8def; --accent2: #22b8cf; --danger: #f06262; --text: #e6e8ec;
+      --muted: #9aa3b2; --income: #34c46a; --orange: #f5a060;
+      --row-alt: rgba(255,255,255,0.03); --warn-bg: #3a3214; --warn-text: #fde68a;
+      --warn-border: #6b5a12; --err-bg: #3b1717; --zero-line: #5b6474; --shadow: rgba(0,0,0,0.5);
+    }
+  }
+  :root[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #0f1115; --surface: #171a21; --surface2: #1f232c; --border: #2c313c;
+      --accent: #5b8def; --accent2: #22b8cf; --danger: #f06262; --text: #e6e8ec;
+      --muted: #9aa3b2; --income: #34c46a; --orange: #f5a060;
+      --row-alt: rgba(255,255,255,0.03); --warn-bg: #3a3214; --warn-text: #fde68a;
+      --warn-border: #6b5a12; --err-bg: #3b1717; --zero-line: #5b6474; --shadow: rgba(0,0,0,0.5);
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -168,7 +201,7 @@
     font-family: 'DM Mono', monospace;
   }
   td { padding: 10px 16px; border-top: 1px solid var(--border); vertical-align: middle; }
-  tr:hover td { background: rgba(255,255,255,0.02); }
+  tr:hover td { background: var(--row-alt); }
   .cat-badge {
     display: inline-block; padding: 3px 9px; border-radius: 4px; font-size: 11px;
     font-weight: 500; background: var(--surface2); color: var(--muted);
@@ -209,7 +242,7 @@
   .bar-label { width: 130px; font-size: 12px; color: var(--muted); text-align: right; flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .bar-track { flex: 1; height: 20px; background: var(--surface2); border-radius: 4px; overflow: hidden; }
   .bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; background: var(--accent); }
-  .bar-value { width: 70px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text); }
+  .bar-value { min-width: 70px; white-space: nowrap; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text); }
 
   /* LINE CHART manual */
   .line-svg { width: 100%; height: 180px; }
@@ -303,6 +336,15 @@
   .fmt-pill-amount { background:rgba(220,38,38,0.15); color:var(--danger); }
   .fmt-pill-skip   { background:var(--surface2); color:var(--muted); }
 
+  /* SEARCH */
+  .search-filters { display:flex; gap:8px; flex-wrap:wrap; }
+  /* BUDGETS */
+  .budget-alert { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:8px; font-size:13px; margin-bottom:6px; border:1px solid var(--border); background:var(--surface); }
+  .budget-alert.over { border-color:var(--danger); }
+  .budget-alert.near { border-color:var(--warn-border); }
+  .bar-track { position:relative; }
+  .budget-mark { position:absolute; top:-2px; bottom:-2px; width:2px; background:var(--text); opacity:.55; }
+
   /* ANALYSIS TAB */
   .analysis-selectors { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
   .analysis-selectors label { font-size:12px; color:var(--muted); }
@@ -319,7 +361,7 @@
   .analysis-table { width:100%; border-collapse:collapse; font-size:13px; }
   .analysis-table th { background:var(--surface2); padding:9px 14px; text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.7px; color:var(--muted); border:1px solid var(--border); white-space:nowrap; }
   .analysis-table td { padding:9px 14px; border:1px solid var(--border); vertical-align:middle; }
-  .analysis-table tr:hover td { background:rgba(0,0,0,0.02); }
+  .analysis-table tr:hover td { background:var(--row-alt); }
   .an-new-badge { background:rgba(22,163,74,0.1); color:var(--income); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; margin-left:6px; }
   .an-gone-badge { background:rgba(220,38,38,0.08); color:var(--danger); font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; margin-left:6px; }
   .an-bar-wrap { display:flex; align-items:center; gap:8px; }
@@ -332,7 +374,9 @@
     .annual-grid { grid-template-columns: 120px repeat(12,1fr); }
   }
   @media(max-width:600px) {
-    .cards { grid-template-columns: 1fr 1fr; }
+    .cards { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .card { padding: 14px; }
+    .card-value { font-size: 19px; }
     .app { padding: 12px; }
   }
 </style>
@@ -363,23 +407,27 @@
     <button class="btn" style="width:100%" id="login-btn" onclick="doLogin()">Entrar</button>
     <div style="margin-top:12px;text-align:center">
       <button class="btn ghost" style="width:100%;font-size:12px" onclick="doResetPassword()">He oblidat la contrasenya</button>
+      <button class="btn ghost" id="login-offline" style="width:100%;font-size:12px;margin-top:8px;display:none" onclick="openOfflineFromLogin()">⚡ Sense connexió: veure les darreres dades</button>
     </div>
   </div>
 </div>
 
-<div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#fef9c3;color:#713f12;padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid #fde047">Iniciant...</div>
+<div id="diag" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--warn-bg);color:var(--warn-text);padding:10px 16px;font-family:monospace;font-size:13px;border-bottom:1px solid var(--warn-border)">Iniciant...</div>
 <header>
   <div class="header-top">
-    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v4.8</span></div>
+    <div class="logo">despeses// <span style="font-size:10px;opacity:0.5;font-weight:300">v5.0</span></div>
     <div class="header-right">
       <select class="year-select" id="yearSelect" onchange="onYearChange()"></select>
       <button class="btn" style="font-size:12px;padding:5px 12px;white-space:nowrap" onclick="openImportModal()">↓ Importar</button>
       <div style="position:relative">
         <button class="btn ghost" style="font-size:12px;padding:5px 10px" onclick="toggleDataMenu()" id="dataMenuBtn">⚙</button>
-        <div id="dataMenu" style="display:none;position:absolute;right:0;top:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.12);z-index:200;min-width:210px;padding:6px">
-<button class="data-menu-item" onclick="exportBackup()">↑ Exportar backup</button>
+        <div id="dataMenu" style="display:none;position:absolute;right:0;top:36px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 4px 20px var(--shadow);z-index:200;min-width:210px;padding:6px">
+          <button class="data-menu-item" onclick="exportBackup()">↑ Exportar backup</button>
           <button class="data-menu-item" onclick="document.getElementById('importBackupFile').click()">↓ Restaurar backup</button>
           <input type="file" id="importBackupFile" accept=".json" style="display:none" onchange="importBackup(event)">
+          <button class="data-menu-item" onclick="exportCsvAll()">⬇ Exportar tot a CSV (Excel)</button>
+          <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+          <button class="data-menu-item" id="themeMenuItem" onclick="cycleTheme()">◐ Tema: Automàtic</button>
           <div style="border-top:1px solid var(--border);margin:4px 0"></div>
           <button class="data-menu-item" onclick="openResetModal()">↺ Esborrar dades...</button>
         <div style="border-top:1px solid var(--border);margin:4px 0"></div>
@@ -391,6 +439,7 @@
   <div class="header-nav">
     <nav>
       <button class="active" onclick="showTab('mes')">Mes</button>
+      <button onclick="showTab('cercar')">Cercar</button>
       <button onclick="showTab('anual')">Anual</button>
       <button onclick="showTab('grafics')">Gràfics</button>
       <button onclick="showTab('categories')">Categories</button>
@@ -426,6 +475,8 @@
 
   <div class="month-tabs" id="monthTabs"></div>
 
+  <div id="budgetAlerts" style="display:none;margin-bottom:16px"></div>
+
   <div class="chart-card" id="monthBarWrap" style="margin-bottom:16px">
     <div class="chart-title">Despeses per categoria — <span id="monthBarTitle"></span></div>
     <div class="bar-chart" id="monthBarChart"></div>
@@ -449,6 +500,34 @@
         </tr>
       </thead>
       <tbody id="expenseTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- CERCAR VIEW -->
+<div class="app" id="tab-cercar">
+  <div class="section-header" style="flex-wrap:wrap;gap:10px">
+    <div class="section-title">Cercar apunts</div>
+    <button class="btn ghost sm" onclick="exportSearchCsv()">⬇ CSV dels resultats</button>
+  </div>
+  <div class="search-filters">
+    <input type="search" id="s-text" placeholder="Text, nota, categoria o import..." oninput="renderSearch()" style="flex:3;min-width:200px">
+    <select id="s-year" onchange="renderSearch()" style="flex:1;min-width:110px"></select>
+    <select id="s-cat" onchange="renderSearch()" style="flex:1;min-width:150px"></select>
+    <select id="s-type" onchange="renderSearch()" style="flex:1;min-width:140px">
+      <option value="">Tots els tipus</option>
+      <option value="fixa">Fixes</option>
+      <option value="variable">Variables</option>
+      <option value="ingressos">Ingressos</option>
+      <option value="refund">↩ Devolucions</option>
+      <option value="pending">No compten</option>
+    </select>
+  </div>
+  <div id="s-summary" style="font-size:12px;color:var(--muted);margin:10px 0"></div>
+  <div class="table-wrap">
+    <table style="min-width:560px">
+      <thead><tr><th>Data</th><th>Categoria</th><th>Import</th><th>Notes</th><th>Accions</th></tr></thead>
+      <tbody id="s-results"></tbody>
     </table>
   </div>
 </div>
@@ -496,6 +575,11 @@
     <!-- Left: salary history table -->
     <div style="flex:2;min-width:280px">
       <div class="section-title" style="margin-bottom:16px">Historial de nòmines</div>
+      <div id="histSeedNotice" style="display:none;margin-bottom:12px;padding:10px 12px;border-radius:8px;background:var(--warn-bg);color:var(--warn-text);border:1px solid var(--warn-border);font-size:12px">
+        Les nòmines antigues ja no són al codi públic. Per recuperar-les, restaura un cop el fitxer
+        <b>despeses-dades-privades.json</b> (⚙ → Restaurar backup).
+        <a href="#" onclick="dismissHistSeedNotice();return false" style="color:inherit;margin-left:6px">Amagar</a>
+      </div>
       <div style="overflow-x:auto;border-radius:12px;border:1px solid var(--border)">
         <table id="historicTable" style="width:100%;border-collapse:collapse;font-size:12px"></table>
       </div>
@@ -632,11 +716,11 @@
     <div class="section-title">Categories</div>
     <button class="btn" onclick="openCatModal()">+ Nova categoria</button>
   </div>
-  <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Arrossega les files (o fes servir ↑ ↓) per canviar l'ordre. L'ordre afecta les taules i gràfics i es guarda al teu compte.</p>
+  <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Arrossega les files (o fes servir ↑ ↓) per canviar l'ordre. L'ordre afecta les taules i gràfics i es guarda al teu compte. Posa un pressupost mensual a les categories que vulguis controlar: veuràs avisos a la vista del mes.</p>
   <div class="table-wrap">
     <table>
       <thead>
-        <tr><th style="width:110px">Ordre</th><th>Nom</th><th>Tipus</th><th>Accions</th></tr>
+        <tr><th style="width:110px">Ordre</th><th>Nom</th><th>Tipus</th><th>Pressupost/mes</th><th>Accions</th></tr>
       </thead>
       <tbody id="catTable"></tbody>
     </table>
@@ -673,6 +757,15 @@
         <select id="f-year" style="width:90px"></select>
       </div>
       <div style="font-size:11px;color:var(--muted);margin-top:4px">Deixa el dia en blanc si no vols especificar-lo</div>
+    </div>
+    <div class="form-row" id="f-refund-row" style="margin-bottom:8px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2)">
+        <input type="checkbox" id="f-refund" style="accent-color:var(--income);width:15px;height:15px">
+        <div>
+          <div style="font-size:13px;font-weight:500">↩ És una devolució</div>
+          <div style="font-size:11px;color:var(--muted)" id="f-refund-hint">Resta del total de la categoria (p. ex. un retorn d'una compra)</div>
+        </div>
+      </label>
     </div>
     <div class="form-row" style="margin-bottom:4px">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--surface2)">
@@ -760,11 +853,15 @@
       <textarea id="importText" style="min-height:150px;font-family:'DM Mono',monospace;font-size:12px" placeholder="Enganxa aquí el text copiat del banc..."></textarea>
     </div>
     <div class="form-row">
-      <div class="form-label">Mes destí</div>
+      <div class="form-label">Mes de referència</div>
       <div style="display:flex;gap:10px">
         <select id="import-month" style="flex:1"></select>
         <select id="import-year" style="flex:1"></select>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12px;color:var(--muted);cursor:pointer">
+        <input type="checkbox" id="import-use-dates" checked>
+        Assignar cada moviment al mes de la seva data (el mes de referència s'usa si no en té)
+      </label>
     </div>
     <div class="form-actions">
       <button class="btn ghost" onclick="closeModal('importModal')">Cancel·lar</button>
@@ -817,7 +914,8 @@
       <h3>Revisar despeses importades</h3>
       <button class="btn ghost sm" onclick="closeModal('reviewModal')">✕</button>
     </div>
-    <p style="color:var(--muted);font-size:12px;margin-bottom:16px">Assigna la categoria correcta a cada despesa. Les categories marcades amb ★ s'han recordat d'importacions anteriors.</p>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:16px">Assigna la categoria correcta a cada despesa. Les categories marcades amb ★ s'han recordat d'importacions anteriors. Un ingrés posat en una categoria de despesa es guarda com a devolució (↩) i resta d'aquella categoria.</p>
+    <div id="reviewMonthsInfo" style="font-size:12px;font-weight:600;color:var(--accent);margin:-8px 0 12px"></div>
     <div id="reviewList" style="display:flex;flex-direction:column;gap:10px;max-height:55vh;overflow-y:auto;padding-right:4px"></div>
     <div id="importResult" style="display:none;margin-top:16px;padding:14px 16px;border-radius:10px;background:var(--surface2);border:1px solid var(--border);font-size:13px"></div>
     <!-- DUP DETAIL panel (inline, hidden until clicked) -->
@@ -973,79 +1071,7 @@ const DEFAULT_CATS = [
   {id:'neteja', name:'Neteja', type:'variable'},
 ];
 
-// Pre-loaded historical data (year -> month(0-11) -> [{cat, amount, notes}])
-const SEED_DATA = {
-  2021: {
-    0:[{cat:'nomina',amount:2333.64},{cat:'hipoteca',amount:700},{cat:'llum',amount:93.92},{cat:'aigua',amount:36.35},{cat:'comunitat',amount:154},{cat:'telefon',amount:41.99},{cat:'parking',amount:25},{cat:'menjar',amount:400},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
-    1:[{cat:'nomina',amount:2786.11},{cat:'hipoteca',amount:700},{cat:'llum',amount:94.38},{cat:'comunitat',amount:60},{cat:'telefon',amount:41.99},{cat:'parking',amount:25},{cat:'menjar',amount:400},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
-    2:[{cat:'nomina',amount:3053.8},{cat:'hipoteca',amount:700},{cat:'llum',amount:53.14},{cat:'aigua',amount:38.2},{cat:'telefon',amount:41.99},{cat:'cup',amount:60},{cat:'parking',amount:25},{cat:'menjar',amount:400},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
-    3:[{cat:'nomina',amount:5427.16},{cat:'hipoteca',amount:700},{cat:'llum',amount:70.22},{cat:'comunitat',amount:154},{cat:'telefon',amount:80.99},{cat:'parking',amount:25},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:400},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
-    4:[{cat:'nomina',amount:2897.88},{cat:'hipoteca',amount:700},{cat:'llum',amount:75.4},{cat:'aigua',amount:36.35},{cat:'telefon',amount:74.58},{cat:'parking',amount:25.99},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:79.93},{cat:'menjar',amount:82.99},{cat:'benzina',amount:30},{cat:'neteja',amount:80}],
-    5:[{cat:'nomina',amount:4029.44,notes:'nom+pis'},{cat:'hipoteca',amount:922.79},{cat:'llum',amount:69.58},{cat:'telefon',amount:66.67},{cat:'cup',amount:60},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:126},{cat:'altres',amount:681.5,notes:'farm+bar+dent+hisenda'},{cat:'benzina',amount:9.43},{cat:'neteja',amount:80}],
-    6:[{cat:'nomina',amount:4095,notes:'nom+pis'},{cat:'hipoteca',amount:1526.3},{cat:'aigua',amount:55.94},{cat:'comunitat',amount:154},{cat:'telefon',amount:66.6},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:146},{cat:'altres',amount:980.23,notes:'bicing+dent+vacances'},{cat:'benzina',amount:10},{cat:'neteja',amount:80}],
-    7:[{cat:'nomina',amount:3129},{cat:'hipoteca',amount:789.9},{cat:'telefon',amount:101.4},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:71.22},{cat:'menjar',amount:298},{cat:'altres',amount:1201,notes:'pintura+diposit com+mudança'},{cat:'benzina',amount:10}],
-    8:[{cat:'nomina',amount:2977},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:33.68},{cat:'aigua',amount:25.5},{cat:'gas',amount:36.3},{cat:'telefon',amount:65.65},{cat:'cup',amount:60},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:182},{cat:'altres',amount:505,notes:'amazon+drogueria+vacances+dentista'},{cat:'neteja',amount:80}],
-    9:[{cat:'nomina',amount:2957},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:42.4},{cat:'gas',amount:8.61},{cat:'comunitat',amount:154},{cat:'telefon',amount:67.99},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'menjar',amount:65},{cat:'altres',amount:980,notes:'llibres, farm,teatre,roma,dentista,bambes'},{cat:'benzina',amount:10},{cat:'neteja',amount:110}],
-    10:[{cat:'nomina',amount:2999},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:37.53},{cat:'aigua',amount:44.44},{cat:'gas',amount:28.31},{cat:'telefon',amount:67.99},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:71.22},{cat:'menjar',amount:166.7},{cat:'altres',amount:950,notes:'brita, ps4, neu, assecadora'},{cat:'benzina',amount:20.6},{cat:'neteja',amount:110}],
-    11:[{cat:'nomina',amount:2684},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:39.16},{cat:'cup',amount:60},{cat:'barca',amount:195},{cat:'collegi',amount:61.6},{cat:'parking',amount:25.33},{cat:'netflix',amount:11.99},{cat:'fons',amount:50},{cat:'piscina',amount:96.42},{cat:'menjar',amount:210.78},{cat:'altres',amount:1026.7,notes:'neu, lotr, liceu, llibres'},{cat:'benzina',amount:10.42},{cat:'neteja',amount:165}],
-  },
-  2022: {
-    0:[{cat:'nomina',amount:2582.06},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:59.83},{cat:'aigua',amount:44.44},{cat:'gas',amount:24.77},{cat:'comunitat',amount:154},{cat:'telefon',amount:67.99},{cat:'collegi',amount:61.6},{cat:'parking',amount:25.33},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'menjar',amount:203},{cat:'altres',amount:917,notes:'metro, moto, llibre, tests,xbox, sudadera, barça'},{cat:'benzina',amount:10.23},{cat:'neteja',amount:110}],
-    1:[{cat:'nomina',amount:3660,notes:'bonus mil'},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:105.12},{cat:'comunitat',amount:60},{cat:'telefon',amount:67.99},{cat:'parking',amount:84},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:71.22},{cat:'menjar',amount:127},{cat:'altres',amount:394.29,notes:'climbat, sharma, garrotxa,llibres,avinentesa, ferreteria'},{cat:'benzina',amount:29.2},{cat:'neteja',amount:55}],
-    2:[{cat:'nomina',amount:3124.44},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:62.59},{cat:'aigua',amount:43.5},{cat:'gas',amount:40.5},{cat:'telefon',amount:67.99},{cat:'cup',amount:60},{cat:'parking',amount:0},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:45.73},{cat:'menjar',amount:170},{cat:'altres',amount:238,notes:'plc, metro,aniv'},{cat:'benzina',amount:33}],
-    3:[{cat:'nomina',amount:5729.92},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:76.28},{cat:'comunitat',amount:154},{cat:'telefon',amount:84.65},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:173},{cat:'altres',amount:799,notes:'farm,soterrani,girona,sj,moto,sudadera'},{cat:'benzina',amount:20},{cat:'neteja',amount:55}],
-    4:[{cat:'nomina',amount:3362.7},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:87.02},{cat:'aigua',amount:43.85},{cat:'gas',amount:23.52},{cat:'telefon',amount:67.99},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:104},{cat:'altres',amount:168,notes:'teatre,cine,llibres,farmacia, roda'},{cat:'benzina',amount:20},{cat:'neteja',amount:110}],
-    5:[{cat:'nomina',amount:3112},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:27.64},{cat:'comunitat',amount:60},{cat:'telefon',amount:67.99},{cat:'cup',amount:60},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:83.23},{cat:'ibi',amount:489.89},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:125},{cat:'altres',amount:960,notes:'farm, port aventura, samarretes, girona, hisenda'},{cat:'benzina',amount:28},{cat:'neteja',amount:110}],
-    6:[{cat:'nomina',amount:3454},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:44.36},{cat:'aigua',amount:43.85},{cat:'gas',amount:33.02},{cat:'comunitat',amount:154},{cat:'telefon',amount:67.99},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:148},{cat:'bar',amount:0},{cat:'altres',amount:839,notes:'multa, afeit, avio alb, dent,cine, poster jp'},{cat:'benzina',amount:31.64},{cat:'neteja',amount:110}],
-    7:[{cat:'nomina',amount:3039},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:44.34},{cat:'telefon',amount:67.99},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.71},{cat:'asseg_moto',amount:8.84},{cat:'gimnàs',amount:48.85},{cat:'menjar',amount:104},{cat:'altres',amount:1213,notes:'albania, sitges kayak, zarautz, farm, ferret'},{cat:'benzina',amount:16}],
-    8:[{cat:'nomina',amount:3069},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:60.22},{cat:'aigua',amount:51},{cat:'telefon',amount:67.99},{cat:'cup',amount:60},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:14.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'bar',amount:72},{cat:'menjar',amount:105},{cat:'altres',amount:596,notes:'alb, sotana,pica'},{cat:'benzina',amount:8}],
-    9:[{cat:'nomina',amount:3296.9},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:64},{cat:'gas',amount:29.67},{cat:'comunitat',amount:154},{cat:'telefon',amount:77.98},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'gimnàs',amount:48.85},{cat:'bar',amount:53},{cat:'menjar',amount:141},{cat:'altres',amount:319,notes:'fifa, soterrani, estamos,ruina, barça, bambes, humitat aire'},{cat:'benzina',amount:27.6},{cat:'neteja',amount:55}],
-    10:[{cat:'nomina',amount:3071,notes:'amortitz'},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:42.2},{cat:'aigua',amount:42.91},{cat:'gas',amount:27},{cat:'telefon',amount:77.98},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:12.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.71},{cat:'gimnàs',amount:48.85},{cat:'bar',amount:44.12},{cat:'menjar',amount:106},{cat:'altres',amount:2196,notes:'jaqueta, disney, llibreta, universal, sonic, jerseis'},{cat:'benzina',amount:22.95}],
-    11:[{cat:'nomina',amount:2694},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:36.5},{cat:'agua',amount:0},{cat:'gas',amount:27.24},{cat:'cup',amount:60},{cat:'barca',amount:208},{cat:'telefon',amount:77.98},{cat:'parking',amount:37},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:62.99},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.71},{cat:'gimnàs',amount:48.85},{cat:'bar',amount:119},{cat:'menjar',amount:137},{cat:'altres',amount:1063,notes:'regals, jerseis,sotana, llibres, amic inv, sofa1, texans'},{cat:'benzina',amount:17.86},{cat:'neteja',amount:110}],
-  },
-  2023: {
-    0:[{cat:'nomina',amount:2877.66},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:82.14},{cat:'aigua',amount:35.73},{cat:'gas',amount:8.4},{cat:'comunitat',amount:154},{cat:'telefon',amount:71.87},{cat:'collegi',amount:61.6},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:18.44},{cat:'fons',amount:50},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:19},{cat:'bar',amount:67},{cat:'altres',amount:1300,notes:'disney'},{cat:'benzina',amount:10},{cat:'neteja',amount:55}],
-    1:[{cat:'nomina',amount:3752,notes:'minibonus 750'},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:42.67},{cat:'gas',amount:32.7},{cat:'comunitat',amount:60},{cat:'telefon',amount:67.99},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:27.45},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.71},{cat:'gimnàs',amount:53.81},{cat:'menjar',amount:164},{cat:'bar',amount:187},{cat:'altres',amount:276,notes:'tarantino, regal,itv'},{cat:'benzina',amount:27},{cat:'neteja',amount:110}],
-    2:[{cat:'nomina',amount:3378.56,notes:'amortitz'},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:79.66},{cat:'aigua',amount:34.82},{cat:'telefon',amount:62.9},{cat:'cup',amount:60},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:27.45},{cat:'fons',amount:50},{cat:'ibi',amount:123.53},{cat:'asseg_moto',amount:144.9},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:118},{cat:'bar',amount:186},{cat:'altres',amount:1342,notes:'boda ferran, regal, sofa'},{cat:'benzina',amount:27},{cat:'neteja',amount:110}],
-    3:[{cat:'nomina',amount:4654.82},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:47.95},{cat:'comunitat',amount:154},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:15},{cat:'fons',amount:50},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:128},{cat:'bar',amount:213},{cat:'altres',amount:463,notes:'tarantino, fcb,cruilla,bici,mandoxbox'},{cat:'benzina',amount:20}],
-    4:[{cat:'nomina',amount:3227.43},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:42.85},{cat:'aigua',amount:35.79},{cat:'gas',amount:35},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:18},{cat:'fons',amount:50},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:102},{cat:'bar',amount:93},{cat:'altres',amount:129,notes:'zelda'},{cat:'benzina',amount:29}],
-    5:[{cat:'nomina',amount:3167.95},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:44.7},{cat:'comunitat',amount:154},{cat:'telefon',amount:62.9},{cat:'cup',amount:60},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:81.95},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:108},{cat:'bar',amount:168},{cat:'altres',amount:747,notes:'vols escocia, decathlon, soterrani,hisenda'},{cat:'benzina',amount:27},{cat:'neteja',amount:110}],
-    6:[{cat:'nomina',amount:3358.32},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:45},{cat:'aigua',amount:35.79},{cat:'gas',amount:22.21},{cat:'comunitat',amount:154},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'collegi',amount:64.8},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:125},{cat:'bar',amount:144},{cat:'altres',amount:1191,notes:'farm,tren liv,roba, pijama, escocia, jarque,blanes,bambes'},{cat:'benzina',amount:21},{cat:'neteja',amount:55}],
-    7:[{cat:'nomina',amount:3054},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:62},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:73.47},{cat:'asseg_moto',amount:8.84},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:113},{cat:'bar',amount:82},{cat:'altres',amount:1398,notes:'fifa,vielha, jocs,998 vacances escocia'},{cat:'benzina',amount:16},{cat:'neteja',amount:55}],
-    8:[{cat:'nomina',amount:3540},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:43.62},{cat:'aigua',amount:33.86},{cat:'telefon',amount:62.9},{cat:'cup',amount:60},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'ibi',amount:123.53},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:73},{cat:'bar',amount:88},{cat:'altres',amount:1126,notes:'998 vacances,bambes, llibre'},{cat:'benzina',amount:10},{cat:'neteja',amount:110}],
-    9:[{cat:'nomina',amount:3463.9},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:54},{cat:'gas',amount:20},{cat:'comunitat',amount:154},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:58},{cat:'bar',amount:137},{cat:'altres',amount:1829,notes:'telf,tignes, viatge delta ebre'},{cat:'benzina',amount:20},{cat:'neteja',amount:55}],
-    10:[{cat:'nomina',amount:3353.38},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:42.29},{cat:'agua',amount:0},{cat:'gas',amount:0},{cat:'telefon',amount:62.9},{cat:'parking',amount:40.82},{cat:'gamepass',amount:12.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:73.47},{cat:'ibi',amount:123.53},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:138},{cat:'bar',amount:45},{cat:'altres',amount:610,notes:'ruina, jaqueta neu,decathlon,farmacia'},{cat:'benzina',amount:19},{cat:'neteja',amount:55}],
-    11:[{cat:'nomina',amount:2965.99,notes:'amortitz'},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:50.42},{cat:'aigua',amount:33.86},{cat:'gas',amount:67},{cat:'cup',amount:60},{cat:'barca',amount:208},{cat:'parking',amount:40.82},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:55},{cat:'fons',amount:50},{cat:'asseg_llar',amount:73.47},{cat:'ibi',amount:123.53},{cat:'gimnàs',amount:50.31},{cat:'menjar',amount:117},{cat:'bar',amount:186},{cat:'altres',amount:1107,notes:'tignes, regals,jarque'},{cat:'benzina',amount:9},{cat:'neteja',amount:110}],
-  },
-  2024: {
-    0:[{cat:'nomina',amount:3350},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:64.47},{cat:'aigua',amount:33.86},{cat:'comunitat',amount:154},{cat:'telefon',amount:63.94},{cat:'barca',amount:215},{cat:'collegi',amount:64.8},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:25,notes:'google one'},{cat:'fons',amount:50},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:120},{cat:'bar',amount:137},{cat:'altres',amount:222,notes:'jersei, cine'},{cat:'benzina',amount:9},{cat:'neteja',amount:110}],
-    1:[{cat:'nomina',amount:3984,notes:'minibonus'},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:50.97},{cat:'aigua',amount:31},{cat:'comunitat',amount:60},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:73.47},{cat:'gimnàs',amount:55.96},{cat:'menjar',amount:73},{cat:'bar',amount:154},{cat:'altres',amount:688,notes:'dentista, lego,teatre, sabates camisa,barça,bambes'},{cat:'benzina',amount:19},{cat:'neteja',amount:110}],
-    2:[{cat:'nomina',amount:3481},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:43.23},{cat:'aigua',amount:43.5},{cat:'telefon',amount:65.19},{cat:'cup',amount:60},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'ibi',amount:124.58},{cat:'asseg_moto',amount:153.3},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:126},{cat:'bar',amount:232},{cat:'altres',amount:942,notes:'concert,boda,dentista, aniversari'},{cat:'benzina',amount:27},{cat:'neteja',amount:55}],
-    3:[{cat:'nomina',amount:7104},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:60},{cat:'gas',amount:22.78},{cat:'comunitat',amount:154},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:788,notes:'disney,madrid hotel'},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:93},{cat:'bar',amount:243},{cat:'altres',amount:810,notes:'berto, farmacia,volley, dentista,decathlon'},{cat:'benzina',amount:30}],
-    4:[{cat:'nomina',amount:3558},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:33},{cat:'aigua',amount:39.35},{cat:'gas',amount:23.89},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:82.09},{cat:'ibi',amount:124.58},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:82},{cat:'bar',amount:162},{cat:'altres',amount:907,notes:'entrades ignasi, farmacia, bilbao, madrid'},{cat:'benzina',amount:20}],
-    5:[{cat:'nomina',amount:3524},{cat:'hipoteca',amount:789.9},{cat:'llum',amount:42},{cat:'comunitat',amount:60},{cat:'telefon',amount:65.19},{cat:'cup',amount:60},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:81},{cat:'bar',amount:159},{cat:'altres',amount:1176,notes:'volley, dentista, padel, pijama,roba, bambes'},{cat:'benzina',amount:29},{cat:'neteja',amount:110}],
-    6:[{cat:'nomina',amount:3326},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:45},{cat:'aigua',amount:39.35},{cat:'gas',amount:26.38},{cat:'comunitat',amount:179,notes:'pendent de la pujada'},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_moto',amount:8.84},{cat:'vacances',amount:311,notes:'irlanda, vielha'},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:156},{cat:'bar',amount:206},{cat:'altres',amount:943,notes:'hisenda, dentista, aixeta, ulleres'},{cat:'benzina',amount:19},{cat:'neteja',amount:110}],
-    7:[{cat:'nomina',amount:3568},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:32.65},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.05},{cat:'vacances',amount:417},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:164},{cat:'bar',amount:267},{cat:'altres',amount:220,notes:'cine, r36s, teatre'},{cat:'benzina',amount:10},{cat:'neteja',amount:110}],
-    8:[{cat:'nomina',amount:3685},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:60},{cat:'aigua',amount:37.09},{cat:'gas',amount:14.56},{cat:'telefon',amount:65.84},{cat:'cup',amount:60},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'ibi',amount:124.58},{cat:'vacances',amount:808},{cat:'gimnàs',amount:52.32},{cat:'menjar',amount:203},{cat:'bar',amount:61},{cat:'altres',amount:96},{cat:'benzina',amount:10},{cat:'neteja',amount:55}],
-    9:[{cat:'nomina',amount:3486},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:31.87},{cat:'aigua',amount:9.26},{cat:'gas',amount:8.42},{cat:'comunitat',amount:163},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:14.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:537,notes:'globus'},{cat:'gimnàs',amount:0},{cat:'menjar',amount:196},{cat:'bar',amount:203},{cat:'altres',amount:622,notes:'dragon ball sparking, fifa, barça, ferula'},{cat:'benzina',amount:29},{cat:'neteja',amount:75}],
-    10:[{cat:'nomina',amount:3811},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:23.25},{cat:'aigua',amount:37.09},{cat:'gas',amount:28.69},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.05},{cat:'ibi',amount:124.6},{cat:'vacances',amount:50,notes:'vielha'},{cat:'gimnàs',amount:288,notes:'volley'},{cat:'menjar',amount:140},{cat:'bar',amount:164},{cat:'altres',amount:653,notes:'hisenda, decathlon jaqueta, tarjeta amazon, db legends, entrades berto i ruina maig'},{cat:'benzina',amount:20},{cat:'neteja',amount:55}],
-    11:[{cat:'nomina',amount:3095},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:44.19},{cat:'cup',amount:60},{cat:'barca',amount:219},{cat:'telefon',amount:65.19},{cat:'parking',amount:43.27},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:55,notes:'amazon'},{cat:'fons',amount:50},{cat:'ibi',amount:124.6},{cat:'menjar',amount:80},{cat:'bar',amount:210},{cat:'altres',amount:375,notes:'manga, privalia'},{cat:'benzina',amount:20},{cat:'neteja',amount:165}],
-  },
-  2025: {
-    0:[{cat:'nomina',amount:3230},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:52.34},{cat:'aigua',amount:39.65},{cat:'gas',amount:8.42},{cat:'comunitat',amount:163},{cat:'telefon',amount:65.92},{cat:'collegi',amount:67},{cat:'parking',amount:43.27},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:75,notes:'google one, amazon'},{cat:'fons',amount:50},{cat:'vacances',amount:302,notes:'vielha'},{cat:'menjar',amount:98},{cat:'bar',amount:155},{cat:'altres',amount:993,notes:'privalia, escalfador'},{cat:'benzina',amount:20},{cat:'neteja',amount:55}],
-    1:[{cat:'nomina',amount:4519.94,notes:'minibonus'},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:59.84},{cat:'gas',amount:28.6},{cat:'comunitat',amount:76.6},{cat:'telefon',amount:68.69},{cat:'parking',amount:44},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:72.05},{cat:'menjar',amount:86},{cat:'bar',amount:109},{cat:'altres',amount:232,notes:'privalia'},{cat:'benzina',amount:20},{cat:'neteja',amount:110}],
-    2:[{cat:'nomina',amount:3847},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:50.86},{cat:'aigua',amount:39.65},{cat:'gas',amount:28.9},{cat:'telefon',amount:66.79},{cat:'cup',amount:60},{cat:'parking',amount:44},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'ibi',amount:125.64},{cat:'asseg_moto',amount:164.68},{cat:'menjar',amount:183},{cat:'bar',amount:231},{cat:'altres',amount:980,notes:'sotana, dentista, regal joana, volley'},{cat:'benzina',amount:29},{cat:'neteja',amount:110}],
-    3:[{cat:'nomina',amount:7683.49,notes:'bonus'},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:42.68},{cat:'gas',amount:8.66},{cat:'comunitat',amount:163},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:80.69},{cat:'ibi',amount:125.64},{cat:'vacances',amount:23,notes:'final barça copa'},{cat:'menjar',amount:206},{cat:'bar',amount:225},{cat:'altres',amount:972,notes:'barça, dentista, bola drac legend 2'},{cat:'benzina',amount:30},{cat:'neteja',amount:110}],
-    4:[{cat:'nomina',amount:4072},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:37.17},{cat:'aigua',amount:40.47},{cat:'gas',amount:19.29},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'gamepass',amount:17.99},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:136.15,notes:'girona'},{cat:'menjar',amount:97},{cat:'bar',amount:94},{cat:'altres',amount:382,notes:'boda cris'},{cat:'benzina',amount:10},{cat:'neteja',amount:55}],
-    5:[{cat:'nomina',amount:3883.07},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:34.39},{cat:'gas',amount:8.66},{cat:'comunitat',amount:60},{cat:'telefon',amount:81.8},{cat:'cup',amount:60},{cat:'parking',amount:44},{cat:'netflix',amount:105,notes:'google one'},{cat:'fons',amount:50},{cat:'asseg_llar',amount:80.69},{cat:'ibi',amount:125.64},{cat:'vacances',amount:576,notes:'xina corea, palamos'},{cat:'menjar',amount:202},{cat:'bar',amount:152},{cat:'altres',amount:1225,notes:'entrades ruina, volley, farmacia, revisio moto, hisenda'},{cat:'benzina',amount:20},{cat:'neteja',amount:110}],
-    6:[{cat:'nomina',amount:3991},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:37.7},{cat:'aigua',amount:39.82},{cat:'gas',amount:30.27},{cat:'comunitat',amount:156},{cat:'telefon',amount:66.79},{cat:'collegi',amount:68.9},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:174,notes:'vielha'},{cat:'menjar',amount:133},{cat:'bar',amount:199,notes:'cumple kimi'},{cat:'altres',amount:1058,notes:'aspiradora, fisio,volley, calaixera ikea, mangabcn, ferreteria, funda sofa, mudaça'},{cat:'benzina',amount:30},{cat:'neteja',amount:165}],
-    7:[{cat:'nomina',amount:4148},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:58.77},{cat:'gas',amount:4.75},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:70.38},{cat:'vacances',amount:135,notes:'grecia'},{cat:'menjar',amount:132},{cat:'bar',amount:110},{cat:'altres',amount:868,notes:'temu moble, bola drac vol 3, fisio, volley'},{cat:'benzina',amount:19}],
-    8:[{cat:'nomina',amount:3751},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:73.26},{cat:'aigua',amount:43.31},{cat:'gas',amount:12.57},{cat:'telefon',amount:127.29,notes:'roaming grecia/albania'},{cat:'cup',amount:60},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:2028,notes:'grecia, madeira'},{cat:'menjar',amount:14},{cat:'bar',amount:238,notes:'sopar mare joana, hospital mama'},{cat:'altres',amount:100,notes:'farmacia'},{cat:'benzina',amount:9}],
-    9:[{cat:'nomina',amount:3839},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:55.95},{cat:'gas',amount:8.66},{cat:'comunitat',amount:156},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'vacances',amount:1493.5,notes:'madeira, 400 pendent grecia, casa rural'},{cat:'gimnàs',amount:267.1,notes:'gimnas + padel'},{cat:'menjar',amount:157},{cat:'bar',amount:56},{cat:'altres',amount:362,notes:'llibres, barça'},{cat:'benzina',amount:30},{cat:'neteja',amount:108.9}],
-    10:[{cat:'nomina',amount:4199},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:42.6},{cat:'aigua',amount:45.63},{cat:'gas',amount:8.66},{cat:'telefon',amount:67.58},{cat:'parking',amount:44},{cat:'netflix',amount:5},{cat:'fons',amount:50},{cat:'asseg_llar',amount:70.38},{cat:'ibi',amount:125.64},{cat:'vacances',amount:124.6,notes:'vielha'},{cat:'gimnàs',amount:511.8,notes:'50 i 266,8 volley i kenko'},{cat:'menjar',amount:164,notes:'menjar gates'},{cat:'bar',amount:180},{cat:'altres',amount:350,notes:'air fryer, teatre, guants moto,ruina'},{cat:'benzina',amount:30},{cat:'neteja',amount:71.6}],
-    11:[{cat:'nomina',amount:2993.54},{cat:'hipoteca',amount:779.13},{cat:'llum',amount:62.52},{cat:'aigua',amount:9.52},{cat:'gas',amount:8.66},{cat:'cup',amount:60},{cat:'barca',amount:225},{cat:'telefon',amount:66.79},{cat:'parking',amount:44},{cat:'netflix',amount:55,notes:'amazon'},{cat:'fons',amount:50},{cat:'asseg_llar',amount:70.38},{cat:'ibi',amount:125.64},{cat:'vacances',amount:315,notes:'londres,nuria'},{cat:'gimnàs',amount:120,notes:'kenko'},{cat:'menjar',amount:85},{cat:'bar',amount:84.5},{cat:'altres',amount:837,notes:'teatre joana, regals, farmacia, arreglar rentadora'},{cat:'benzina',amount:30},{cat:'neteja',amount:25}],
-  }
-};
+// (Historical seed data removed from the public code in v5.0 — kept privately by the user)
 
 // State
 let state = { year: new Date().getFullYear(), month: new Date().getMonth(), editingId: null, editingCatId: null, sortCol: null, sortDir: 1 };
@@ -1081,15 +1107,40 @@ function pushExpenseLocal(e) {
   expenses[e.year][e.month].push(e);
 }
 function rowToExpense(r) {
-  return { id: r.id, year: parseInt(r.year), month: parseInt(r.month), day: r.day, cat: r.cat, amount: parseFloat(r.amount), notes: r.notes || '', pending: r.pending || false };
+  return { id: r.id, year: parseInt(r.year), month: parseInt(r.month), day: r.day, cat: r.cat, amount: parseFloat(r.amount), notes: r.notes || '', pending: r.pending || false, refund: !!r.refund };
+}
+// Signed value of an entry for totals: a refund (devolució) subtracts from its category
+function val(e) { return e.refund ? -Math.abs(e.amount) : Math.abs(e.amount); }
+function amountHtml(e) {
+  if (e.refund) return `<span style="color:var(--income)" title="Devolució: resta del total de la categoria">↩ −${fmtE(Math.abs(e.amount))}</span>`;
+  if (getCat(e.cat).type === 'ingressos') return `<span style="color:var(--income)">+${fmtE(Math.abs(e.amount))}</span>`;
+  return fmtE(Math.abs(e.amount));
+}
+
+// The `refund` column only exists after running supabase/migracio.sql
+let hasRefundCol = false;
+async function detectRefundColumn() {
+  const { error } = await sb.from('expenses').select('refund').limit(1);
+  hasRefundCol = !error;
+}
+// Row fields to send to Supabase for an entry
+function expenseRow(rec) {
+  const row = {
+    year: rec.year, month: rec.month, day: rec.day || null,
+    cat: rec.cat, amount: Math.abs(rec.amount), notes: rec.notes || '',
+    pending: rec.pending || false
+  };
+  if (hasRefundCol) row.refund = !!rec.refund;
+  return row;
 }
 
 // Re-render the month view + whichever tab is visible
-const TABS = ['mes','anual','grafics','categories','merchants','analisi','historic'];
+const TABS = ['mes','cercar','anual','grafics','categories','merchants','analisi','historic'];
 function activeTab() {
   return TABS.find(t => document.getElementById('tab-' + t)?.classList.contains('visible')) || 'mes';
 }
 function refreshViews() {
+  scheduleSnapshot();
   renderMonthTabs();
   renderCards();
   renderTable();
@@ -1101,6 +1152,7 @@ function refreshViews() {
   else if (tab === 'merchants') renderMerchants();
   else if (tab === 'analisi') { initAnalysisSelectors(true); renderAnalysis(); }
   else if (tab === 'historic') renderHistoric();
+  else if (tab === 'cercar') { initSearchFilters(); renderSearch(); }
 }
 
 // ============================================================
@@ -1168,8 +1220,13 @@ async function doLogin() {
 
 async function doLogout() {
   document.getElementById('dataMenu').style.display = 'none';
+  // Don't leave this user's data (offline copy, settings, formats) on the device
+  clearLocalUserData();
   _authHandled = false;
-  await sb.auth.signOut();
+  const wasOffline = offlineMode;
+  offlineMode = false;
+  try { await sb.auth.signOut(wasOffline ? { scope: 'local' } : undefined); } catch(e) {}
+  if (wasOffline) onAuthChange(null);
 }
 
 async function doResetPassword() {
@@ -1237,7 +1294,7 @@ async function fetchAllRows(table, uid, orderCol) {
 }
 
 async function saveCategories() {
-  if (!currentUser) return;
+  if (!currentUser || !canWrite()) return;
   const uid = currentUser.id;
   const { error } = await sb.from('categories').upsert(
     categories.map(c => ({ user_id: uid, cat_id: c.id, name: c.name, type: c.type }))
@@ -1263,6 +1320,7 @@ function applyCategoryOrder() {
 // Upsert merchants in batches. Pass a list of names to save only those.
 async function saveMerchants(names) {
   if (!currentUser) return true;
+  if (!canWrite()) return false;
   const uid = currentUser.id;
   const list = (names || Object.keys(merchants)).filter(n => merchants[n]);
   const rows = list.map(name => ({ user_id: uid, merchant_name: name, cat: merchants[name].cat, count: merchants[name].count }));
@@ -1274,12 +1332,9 @@ async function saveMerchants(names) {
 }
 
 async function addExpense(rec) {
-  if (!currentUser) return null;
+  if (!currentUser || !canWrite()) return null;
   const { data, error } = await sb.from('expenses').insert({
-    user_id: currentUser.id,
-    year: rec.year, month: rec.month, day: rec.day || null,
-    cat: rec.cat, amount: rec.amount, notes: rec.notes || '',
-    pending: rec.pending || false
+    user_id: currentUser.id, ...expenseRow(rec)
   }).select().single();
   if (error || !data) { console.error(error); return null; }
   const e = rowToExpense(data);
@@ -1289,13 +1344,9 @@ async function addExpense(rec) {
 
 // Update an existing expense in place (keeps its id; never delete+insert)
 async function updateExpense(id, rec) {
-  if (!currentUser) return false;
+  if (!currentUser || !canWrite()) return false;
   const numId = Number(id);
-  const { data, error } = await sb.from('expenses').update({
-    year: rec.year, month: rec.month, day: rec.day || null,
-    cat: rec.cat, amount: rec.amount, notes: rec.notes || '',
-    pending: rec.pending || false
-  }).eq('id', numId).eq('user_id', currentUser.id).select();
+  const { data, error } = await sb.from('expenses').update(expenseRow(rec)).eq('id', numId).eq('user_id', currentUser.id).select();
   if (error || !data || !data.length) { console.error(error); return false; }
   removeExpenseLocal(numId);
   pushExpenseLocal(rowToExpense(data[0]));
@@ -1304,6 +1355,7 @@ async function updateExpense(id, rec) {
 
 // Delete one expense in Supabase and in memory. Returns true on success.
 async function removeExpense(id) {
+  if (!canWrite()) return false;
   const numId = Number(id);
   const { data, error } = await sb.from('expenses')
     .delete()
@@ -1317,6 +1369,7 @@ async function removeExpense(id) {
 }
 
 async function putCat(cat) {
+  if (!canWrite()) return false;
   if (currentUser) {
     const { error } = await sb.from('categories').upsert({ user_id: currentUser.id, cat_id: cat.id, name: cat.name, type: cat.type });
     if (error) { showToast('Error guardant la categoria: ' + error.message, 'error'); return false; }
@@ -1328,6 +1381,7 @@ async function putCat(cat) {
 }
 
 async function delCat(id) {
+  if (!canWrite()) return false;
   if (currentUser) {
     const { error } = await sb.from('categories').delete().eq('cat_id', id).eq('user_id', currentUser.id);
     if (error) { showToast('Error: ' + error.message, 'error'); return false; }
@@ -1338,6 +1392,7 @@ async function delCat(id) {
 }
 
 async function putMerchant(m) {
+  if (!canWrite()) return false;
   if (currentUser) {
     const { error } = await sb.from('merchants').upsert({ user_id: currentUser.id, merchant_name: m.name, cat: m.cat, count: m.count });
     if (error) { showToast('Error: ' + error.message, 'error'); return false; }
@@ -1347,6 +1402,7 @@ async function putMerchant(m) {
 }
 
 async function delMerchant(name) {
+  if (!canWrite()) return false;
   if (currentUser) {
     const { error } = await sb.from('merchants').delete().eq('merchant_name', name).eq('user_id', currentUser.id);
     if (error) { showToast('Error: ' + error.message, 'error'); return false; }
@@ -1360,7 +1416,7 @@ function lsGet(key) { try { const v = localStorage.getItem(key); return v ? JSON
 function lsSet(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch(e) { return false; } }
 
 // Supabase user settings (synced across devices)
-const SB_SETTINGS_KEYS = ['hist_edits','hist_brut','hist_previews','salary_calc','cat_order'];
+const SB_SETTINGS_KEYS = ['hist_edits','hist_brut','hist_previews','salary_calc','cat_order','hist_seed','budgets'];
 let _settingsCache = {};
 
 async function loadUserSettings() {
@@ -1377,6 +1433,7 @@ async function loadUserSettings() {
 }
 
 async function sbSettingSet(key, val) {
+  if (!canWrite()) return;
   _settingsCache[key] = val;
   lsSet(key, val); // fast local cache
   if (!currentUser) return;
@@ -1497,6 +1554,7 @@ async function importBackup(event) {
   document.getElementById('dataMenu').style.display = 'none';
   const file = event.target.files[0];
   if (!file) return;
+  if (!canWrite()) { event.target.value = ''; return; }
   try {
     const text = await file.text();
     const backup = JSON.parse(text);
@@ -1542,6 +1600,11 @@ function showBackupMergeModal(backup) {
   if (onlyInBackup.length)  summaryHtml += `<div style="grid-column:1/-1"><span style="color:var(--income);font-weight:600">+ Anys nous al backup:</span> ${onlyInBackup.join(', ')} — s'afegiran</div>`;
   if (inBoth.length)        summaryHtml += `<div style="grid-column:1/-1"><span style="color:var(--muted)">Anys en comú:</span> ${inBoth.join(', ')}</div>`;
   if (invalid)              summaryHtml += `<div style="grid-column:1/-1;color:var(--danger)">${invalid} entrades amb format incorrecte s'ignoraran</div>`;
+  const SETTING_LABELS = { hist_seed:'nòmines antigues', hist_edits:'edicions de l\'historial', hist_brut:'brut anual', hist_previews:'previsions', salary_calc:'calculadora de sou', budgets:'pressupostos' };
+  const newSettings = Object.keys(backup.settings || {}).filter(k => SETTING_LABELS[k]).map(k => SETTING_LABELS[k]);
+  if (newSettings.length)   summaryHtml += `<div style="grid-column:1/-1"><span style="color:var(--income);font-weight:600">+ Configuració:</span> ${esc(newSettings.join(', '))} (es combina; els teus valors actuals tenen prioritat)</div>`;
+  const refunds = backupExp.filter(e => e.refund).length;
+  if (refunds && !hasRefundCol) summaryHtml += `<div style="grid-column:1/-1;color:var(--danger)">⚠ ${refunds} devolucions: executa abans supabase/migracio.sql o es guardaran com a despeses</div>`;
   summaryHtml += `<div style="grid-column:1/-1;color:var(--muted)">No s'esborra res: només s'afegeixen les entrades, categories i comerços que no tens.</div>`;
   summaryHtml += `</div></div>`;
 
@@ -1607,7 +1670,8 @@ async function confirmBackupMerge() {
   // Expenses (MERGE: nothing is deleted)
   const expRows = backupExp.map(e => ({
     user_id: uid, year: parseInt(e.year), month: parseInt(e.month), day: e.day ? parseInt(e.day) : null,
-    cat: e.cat, amount: Math.abs(parseFloat(e.amount)), notes: e.notes||'', pending: !!e.pending
+    cat: e.cat, amount: Math.abs(parseFloat(e.amount)), notes: e.notes||'', pending: !!e.pending,
+    ...(hasRefundCol ? { refund: !!e.refund } : {})
   }));
   for (let i = 0; i < expRows.length; i += BATCH) {
     btn.textContent = `Important despeses ${i}/${expRows.length}...`;
@@ -1657,6 +1721,7 @@ async function confirmBackupMerge() {
 // ── Reset modal ───────────────────────────────────────────────────────────────
 function openResetModal() {
   document.getElementById('dataMenu').style.display = 'none';
+  if (!canWrite()) return;
   document.getElementById('resetScopeMonthLabel').textContent =
     MONTHS[state.month] + ' ' + state.year;
   document.getElementById('resetScopeYearLabel').textContent =
@@ -1735,11 +1800,11 @@ function getMonthData(year, month) {
 function calcMonth(year, month) {
   const data = getMonthData(year, month).filter(e => !e.pending);
   // Income: always positive (abs)
-  const nomina   = data.filter(e => getCat(e.cat).type === 'ingressos').reduce((s,e)=>s+Math.abs(e.amount),0);
+  const nomina   = data.filter(e => getCat(e.cat).type === 'ingressos').reduce((s,e)=>s+val(e),0);
   // Expenses: always positive (abs) for display and totals
-  const totalExp = data.filter(e => getCat(e.cat).type !== 'ingressos').reduce((s,e)=>s+Math.abs(e.amount),0);
-  const fixed    = data.filter(e => getCat(e.cat).type === 'fixa').reduce((s,e)=>s+Math.abs(e.amount),0);
-  const variable = data.filter(e => getCat(e.cat).type === 'variable').reduce((s,e)=>s+Math.abs(e.amount),0);
+  const totalExp = data.filter(e => getCat(e.cat).type !== 'ingressos').reduce((s,e)=>s+val(e),0);
+  const fixed    = data.filter(e => getCat(e.cat).type === 'fixa').reduce((s,e)=>s+val(e),0);
+  const variable = data.filter(e => getCat(e.cat).type === 'variable').reduce((s,e)=>s+val(e),0);
   return { nomina, totalExp, fixed, variable, estalvi: nomina - totalExp };
 }
 
@@ -1751,6 +1816,18 @@ function renderMonthTabs() {
   el.innerHTML = MONTHS.map((m, i) => `<div class="month-tab ${i===state.month?'active':''}" onclick="selectMonth(${i})">${m.substring(0,3)}</div>`).join('');
 }
 
+function getBudgets() { return sbSettingGet('budgets') || {}; }
+
+async function setBudget(catId, value) {
+  const budgets = { ...getBudgets() };
+  const v = parseFloat(String(value).replace(',', '.'));
+  if (!value || isNaN(v) || v <= 0) delete budgets[catId];
+  else budgets[catId] = Math.round(v * 100) / 100;
+  await sbSettingSet('budgets', budgets);
+  renderMonthBar();
+  showToast('Pressupost guardat');
+}
+
 function renderMonthBar() {
   const yr = state.year, mo = state.month;
   const wrap = document.getElementById('monthBarWrap');
@@ -1758,25 +1835,54 @@ function renderMonthBar() {
   const title = document.getElementById('monthBarTitle');
   if (!wrap || !chart) return;
   title.textContent = MONTHS[mo] + ' ' + yr;
+  const budgets = getBudgets();
   const data = getMonthData(yr, mo).filter(e => getCat(e.cat).type !== 'ingressos' && !e.pending);
-  // Aggregate by category
+  // Aggregate by category (refunds subtract)
   const catTotals = {};
-  data.forEach(e => { catTotals[e.cat] = (catTotals[e.cat]||0) + Math.abs(e.amount); });
-  // Sort by categories order (user-defined)
+  data.forEach(e => { catTotals[e.cat] = (catTotals[e.cat]||0) + val(e); });
+  // Sort by categories order (user-defined); categories with a budget are always shown
   const sorted = categories
-    .filter(c => c.type !== 'ingressos' && catTotals[c.id] > 0)
-    .map(c => [c.id, catTotals[c.id]]);
+    .filter(c => c.type !== 'ingressos' && (catTotals[c.id] > 0 || budgets[c.id] > 0))
+    .map(c => [c.id, Math.max(0, catTotals[c.id] || 0)]);
   // Expenses whose category no longer exists still count
-  Object.keys(catTotals).forEach(cid => { if (!categories.find(c => c.id === cid)) sorted.push([cid, catTotals[cid]]); });
+  Object.keys(catTotals).forEach(cid => { if (!categories.find(c => c.id === cid) && catTotals[cid] > 0) sorted.push([cid, catTotals[cid]]); });
+
+  renderBudgetAlerts(sorted, budgets);
+
   if (!sorted.length) { wrap.style.display = 'none'; return; }
   wrap.style.display = 'block';
-  const maxVal = Math.max(...sorted.map(([,v]) => v));
-  const COLORS = ['var(--accent)','var(--accent2)','#f5a060','#f56060','#c060f5','#60f5a0','#f5e060','#60a0f5'];
-  chart.innerHTML = sorted.map(([cid, v], i) => `
+  const maxVal = Math.max(...sorted.map(([cid, v]) => Math.max(v, budgets[cid] || 0)), 1);
+  const COLORS = ['var(--accent)','var(--accent2)','var(--orange)','#f56060','#c060f5','#60f5a0','#f5e060','#60a0f5'];
+  chart.innerHTML = sorted.map(([cid, v], i) => {
+    const b = budgets[cid];
+    const over = b && v > b;
+    const color = over ? 'var(--danger)' : COLORS[i % COLORS.length];
+    const mark = b ? `<div class="budget-mark" style="left:${(b/maxVal*100).toFixed(1)}%" title="Pressupost ${fmtE(b)}"></div>` : '';
+    return `
     <div class="bar-row">
       <div class="bar-label" title="${esc(getCat(cid).name)}">${esc(getCat(cid).name)}</div>
-      <div class="bar-track"><div class="bar-fill" style="width:${(v/maxVal*100).toFixed(1)}%;background:${COLORS[i%COLORS.length]}"></div></div>
-      <div class="bar-value">${fmtE(v)}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${(v/maxVal*100).toFixed(1)}%;background:${color}"></div>${mark}</div>
+      <div class="bar-value" style="${over?'color:var(--danger);font-weight:600':''}">${fmtE(v)}${b ? `<span style="color:var(--muted);font-weight:400"> / ${fmt(b)}</span>` : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+// Over-budget (>=100%) and almost (>=90%) categories for the selected month
+function renderBudgetAlerts(sorted, budgets) {
+  const el = document.getElementById('budgetAlerts');
+  if (!el) return;
+  const alerts = sorted
+    .filter(([cid]) => budgets[cid] > 0)
+    .map(([cid, v]) => ({ cid, v, b: budgets[cid], pct: v / budgets[cid] * 100 }))
+    .filter(a => a.pct >= 90)
+    .sort((a, b) => b.pct - a.pct);
+  if (!alerts.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = '';
+  el.innerHTML = alerts.map(a => `
+    <div class="budget-alert ${a.pct >= 100 ? 'over' : 'near'}">
+      <span>${a.pct >= 100 ? '⚠' : '◔'}</span>
+      <span style="flex:1"><b>${esc(getCat(a.cid).name)}</b>: ${fmtE(a.v)} de ${fmtE(a.b)}</span>
+      <span style="font-family:'DM Mono',monospace;font-weight:600;color:${a.pct >= 100 ? 'var(--danger)' : 'var(--warn-text)'}">${Math.round(a.pct)}%</span>
     </div>`).join('');
 }
 
@@ -1857,8 +1963,7 @@ function renderTable() {
     return `<tr class="${e.pending?'is-pending':''}">
       <td style="color:var(--muted);font-family:'DM Mono',monospace;font-size:12px">${e.day||'—'}</td>
       <td><span class="cat-badge cat-badge-link" onclick="openDetail('${jsq(e.cat)}',${state.month},${state.year})" title="Veure detall">${esc(cat.name)}</span>${e.pending?'<span class="pending-badge">no compta</span>':''}</td>
-      <td class="amount-cell" style="color:${isIncome?'var(--income)':''}">
-        ${isIncome?'+':''}${fmtE(Math.abs(e.amount))}</td>
+      <td class="amount-cell">${amountHtml(e)}</td>
       <td>${typeLabel}</td>
       <td class="notes-cell" title="${esc(e.notes)}">${esc(e.notes)||'—'}</td>
       <td><div class="action-cell">
@@ -1892,12 +1997,12 @@ function renderAnnual() {
   const catTotals = {};
   for (let m = 0; m < 12; m++) {
     getMonthData(yr, m).filter(e => getCat(e.cat).type !== 'ingressos' && !e.pending).forEach(e => {
-      catTotals[e.cat] = (catTotals[e.cat] || 0) + Math.abs(e.amount);
+      catTotals[e.cat] = (catTotals[e.cat] || 0) + val(e);
     });
   }
-  const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]);
+  const sortedCats = Object.entries(catTotals).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const maxCat = sortedCats[0]?.[1] || 1;
-  const BAR_COLORS = ['var(--accent)','var(--accent2)','#f5a060','#f56060','#c060f5','#60f5a0','#f5e060','#60a0f5'];
+  const BAR_COLORS = ['var(--accent)','var(--accent2)','var(--orange)','#f56060','#c060f5','#60f5a0','#f5e060','#60a0f5'];
 
   // ── KPI cards ────────────────────────────────────────────────────────────
   const kpiHtml = `<div class="annual-kpis">
@@ -1952,7 +2057,7 @@ function renderAnnual() {
   html += `<div class="ag-label ag-row-income">Nòmina</div>`;
   let annualNomina = 0;
   for (let m = 0; m < 12; m++) {
-    const v = getMonthData(yr,m).filter(e=>getCat(e.cat).type==='ingressos' && !e.pending).reduce((s,e)=>s+Math.abs(e.amount),0);
+    const v = getMonthData(yr,m).filter(e=>getCat(e.cat).type==='ingressos' && !e.pending).reduce((s,e)=>s+val(e),0);
     annualNomina += v;
     html += `<div class="ag-cell ag-row-income">${v?fmtE(v):''}</div>`;
   }
@@ -1963,7 +2068,7 @@ function renderAnnual() {
     html += `<div class="ag-label" style="font-size:11px">${esc(cat.name)}</div>`;
     for (let m = 0; m < 12; m++) {
       const items = getMonthData(yr,m).filter(e=>e.cat===cid && !e.pending);
-      const v = items.reduce((s,e)=>s+Math.abs(e.amount),0);
+      const v = items.reduce((s,e)=>s+val(e),0);
       const onclick = v ? `openDetail('${jsq(cid)}',${m},${yr})` : '';
       const cls = v ? 'ag-cell ag-cell-link' : 'ag-cell';
       html += `<div class="${cls}" onclick="${onclick}">${v?fmtE(v):''}</div>`;
@@ -1978,10 +2083,10 @@ function renderAnnual() {
   }
 
   // Total Variable
-  html += `<div class="ag-label" style="font-weight:600;color:#f5a060">Total Variable</div>`;
+  html += `<div class="ag-label" style="font-weight:600;color:var(--orange)">Total Variable</div>`;
   for (let m = 0; m < 12; m++) {
     const v = calcMonth(yr,m).variable;
-    html += `<div class="ag-cell" style="color:#f5a060;font-weight:600">${v?fmtE(v):''}</div>`;
+    html += `<div class="ag-cell" style="color:var(--orange);font-weight:600">${v?fmtE(v):''}</div>`;
   }
 
   // Total Despeses
@@ -2011,12 +2116,12 @@ function renderCharts() {
   const catTotals = {};
   for (let m = 0; m < 12; m++) {
     getMonthData(yr,m).filter(e=>getCat(e.cat).type!=='ingressos'&&!e.pending).forEach(e=>{
-      catTotals[e.cat] = (catTotals[e.cat]||0)+Math.abs(e.amount);
+      catTotals[e.cat] = (catTotals[e.cat]||0)+val(e);
     });
   }
-  const sorted = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const sorted = Object.entries(catTotals).filter(([, v]) => v > 0).sort((a,b)=>b[1]-a[1]).slice(0,12);
   const max = sorted[0]?.[1]||1;
-  const colors = ['var(--accent)','var(--accent2)','#f5a060','#f56060','#c060f5','#60f5a0','#f5e060','#60a0f5'];
+  const colors = ['var(--accent)','var(--accent2)','var(--orange)','#f56060','#c060f5','#60f5a0','#f5e060','#60a0f5'];
   document.getElementById('catBarChart').innerHTML = sorted.map(([cid,v],i)=>`
     <div class="bar-row">
       <div class="bar-label" title="${esc(getCat(cid).name)}">${esc(getCat(cid).name)}</div>
@@ -2068,20 +2173,20 @@ function drawLineChart(id, series) {
   for (let i = 0; i <= steps; i++) {
     const v = minV + (range / steps) * i;
     const y = scaleY(v);
-    html += `<line x1="${PAD_L}" y1="${y}" x2="${W-PAD_R}" y2="${y}" stroke="#e0e2e7" stroke-width="1"/>`;
+    html += `<line x1="${PAD_L}" y1="${y}" x2="${W-PAD_R}" y2="${y}" style="stroke:var(--border)" stroke-width="1"/>`;
     const label = Math.abs(v) >= 1000 ? (v/1000).toFixed(1)+'k' : Math.round(v).toString();
-    html += `<text x="${PAD_L-6}" y="${y+4}" fill="#6b7280" font-size="9" text-anchor="end" font-family="DM Mono,monospace">${label}</text>`;
+    html += `<text x="${PAD_L-6}" y="${y+4}" style="fill:var(--muted)" font-size="9" text-anchor="end" font-family="DM Mono,monospace">${label}</text>`;
   }
 
   // Zero line if negative values present
   if (minV < 0) {
     const y0 = scaleY(0);
-    html += `<line x1="${PAD_L}" y1="${y0}" x2="${W-PAD_R}" y2="${y0}" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>`;
+    html += `<line x1="${PAD_L}" y1="${y0}" x2="${W-PAD_R}" y2="${y0}" style="stroke:var(--zero-line)" stroke-width="1.5" stroke-dasharray="4,3"/>`;
   }
 
   // X labels
   MONTHS.forEach((m,i)=>{
-    html += `<text x="${scaleX(i)}" y="${H-6}" fill="#6b7280" font-size="9" text-anchor="middle" font-family="DM Mono,monospace">${m.substring(0,3)}</text>`;
+    html += `<text x="${scaleX(i)}" y="${H-6}" style="fill:var(--muted)" font-size="9" text-anchor="middle" font-family="DM Mono,monospace">${m.substring(0,3)}</text>`;
   });
 
   // Legend top-right if multiple series
@@ -2090,7 +2195,7 @@ function drawLineChart(id, series) {
       const lx = W - PAD_R - 90;
       const ly = PAD_T + i * 16;
       html += `<line x1="${lx}" y1="${ly+5}" x2="${lx+16}" y2="${ly+5}" stroke="${s.color}" stroke-width="2.5"/>`;
-      html += `<text x="${lx+20}" y="${ly+9}" fill="#6b7280" font-size="9" font-family="DM Sans,sans-serif">${s.label||''}</text>`;
+      html += `<text x="${lx+20}" y="${ly+9}" style="fill:var(--muted)" font-size="9" font-family="DM Sans,sans-serif">${s.label||''}</text>`;
     });
   }
 
@@ -2112,7 +2217,7 @@ function renderMultiYearChart() {
   if (!svg) return;
 
   const YEARS = getAvailableYears();
-  const ALL_COLORS = ['#94a3b8','#60a0f5','#f5a060','#c060f5','#2563eb','#16a34a','#f59e0b','#ec4899'];
+  const ALL_COLORS = ['#94a3b8','#60a0f5','var(--orange)','#c060f5','#2563eb','#16a34a','#f59e0b','#ec4899'];
   const YEAR_COLORS = YEARS.map((_,i) => ALL_COLORS[i % ALL_COLORS.length]);
 
   // Per each year, get monthly total expenses
@@ -2140,13 +2245,13 @@ function renderMultiYearChart() {
   for (let i = 0; i <= steps; i++) {
     const v = (maxV / steps) * i;
     const y = scaleY(v);
-    html += `<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="#e0e2e7" stroke-width="1"/>`;
-    html += `<text x="${PAD_L - 6}" y="${y + 4}" fill="#6b7280" font-size="10" text-anchor="end" font-family="DM Mono,monospace">${Math.round(v)}</text>`;
+    html += `<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" style="stroke:var(--border)" stroke-width="1"/>`;
+    html += `<text x="${PAD_L - 6}" y="${y + 4}" style="fill:var(--muted)" font-size="10" text-anchor="end" font-family="DM Mono,monospace">${Math.round(v)}</text>`;
   }
 
   // X labels
   MONTHS.forEach((m, i) => {
-    html += `<text x="${scaleX(i)}" y="${H - 6}" fill="#6b7280" font-size="10" text-anchor="middle" font-family="DM Mono,monospace">${m.substring(0,3)}</text>`;
+    html += `<text x="${scaleX(i)}" y="${H - 6}" style="fill:var(--muted)" font-size="10" text-anchor="middle" font-family="DM Mono,monospace">${m.substring(0,3)}</text>`;
   });
 
   // Lines per year
@@ -2192,13 +2297,13 @@ function renderCompareTable() {
   const catYear = (cid, yr) => {
     let t = 0;
     for (let m = 0; m < 12; m++)
-      t += getMonthData(yr,m).filter(e=>e.cat===cid && !e.pending).reduce((s,e)=>s+Math.abs(e.amount),0);
+      t += getMonthData(yr,m).filter(e=>e.cat===cid && !e.pending).reduce((s,e)=>s+val(e),0);
     return t;
   };
   const sumYear = (yr, type) => {
     let t = 0;
     for (let m = 0; m < 12; m++)
-      t += getMonthData(yr,m).filter(e => !e.pending && (type==='all' ? getCat(e.cat).type!=='ingressos' : getCat(e.cat).type===type)).reduce((s,e)=>s+Math.abs(e.amount),0);
+      t += getMonthData(yr,m).filter(e => !e.pending && (type==='all' ? getCat(e.cat).type!=='ingressos' : getCat(e.cat).type===type)).reduce((s,e)=>s+val(e),0);
     return t;
   };
   const nomYear = yr => { let t=0; for(let m=0;m<12;m++) t+=calcMonth(yr,m).nomina; return t; };
@@ -2234,7 +2339,7 @@ function renderCompareTable() {
   // Summary rows
   const summaryRows = [
     { label:'Total Fixes',    color:'var(--accent2)', fn: yr => sumYear(yr,'fixa') },
-    { label:'Total Variable', color:'#f5a060',        fn: yr => sumYear(yr,'variable') },
+    { label:'Total Variable', color:'var(--orange)',        fn: yr => sumYear(yr,'variable') },
     { label:'Total Despeses', color:'var(--danger)',   fn: yr => sumYear(yr,'all') },
     { label:'Ingressos',      color:'var(--income)',   fn: yr => nomYear(yr) },
     { label:'Estalvi',        color:'var(--accent)',   fn: yr => estYear(yr) },
@@ -2243,7 +2348,7 @@ function renderCompareTable() {
   html += `<tr><td colspan="${2+YEARS.length}" style="${sepStyle}">Resum anual</td></tr>`;
   summaryRows.forEach(row => {
     const vals = YEARS.map(row.fn);
-    html += `<tr style="background:rgba(0,0,0,0.02)">
+    html += `<tr style="background:var(--row-alt)">
       <td style="${tdLabel};font-weight:600">${row.label}</td>
       <td style="${tdLabel}"></td>
       ${vals.map(v => `<td style="${tdStyle(true, v<0?'var(--danger)':row.color)}">${fmtE(v)}</td>`).join('')}
@@ -2257,7 +2362,8 @@ function renderCompareTable() {
 function renderCategories() {
   const tbody = document.getElementById('catTable');
   const typeLabel = {fixa:'Fixa',variable:'Variable',ingressos:'Ingressos'};
-  const typeColor = {fixa:'var(--accent2)',variable:'#f5a060',ingressos:'var(--income)'};
+  const typeColor = {fixa:'var(--accent2)',variable:'var(--orange)',ingressos:'var(--income)'};
+  const budgets = getBudgets();
   tbody.innerHTML = categories.map((c,i)=>`
     <tr draggable="true" data-idx="${i}" data-id="${c.id}"
         ondragstart="catDragStart(event,${i})"
@@ -2272,6 +2378,8 @@ function renderCategories() {
       </td>
       <td>${esc(c.name)}</td>
       <td><span class="cat-badge" style="color:${typeColor[c.type]||'var(--muted)'}">${esc(typeLabel[c.type]||c.type)}</span></td>
+      <td>${c.type === 'ingressos' ? '' : `<input type="number" min="0" step="1" placeholder="—" value="${budgets[c.id] || ''}"
+            style="width:100px;text-align:right" onchange="setBudget('${jsq(c.id)}', this.value)" ${offlineMode ? 'disabled' : ''}>`}</td>
       <td><div class="action-cell">
         <button class="btn ghost sm" onclick="editCat('${jsq(c.id)}')">Edita</button>
         ${!DEFAULT_CATS.find(d=>d.id===c.id)?`<button class="btn danger sm" onclick="deleteCat('${jsq(c.id)}')">Del</button>`:''}
@@ -2316,7 +2424,7 @@ function openDetail(catId, month, year) {
   const items = getMonthData(year, month).filter(e => e.cat === catId);
   // Sort by day, compute total excluding pending
   const sorted = [...items].sort((a,b) => (a.day||99) - (b.day||99));
-  const total = sorted.filter(e=>!e.pending).reduce((s,e) => s + Math.abs(e.amount), 0);
+  const total = sorted.filter(e=>!e.pending).reduce((s,e) => s + val(e), 0);
   document.getElementById('detail-title').textContent = cat.name;
   document.getElementById('detail-sub').textContent = `${MONTHS[month]} ${year} · ${items.length} apunt${items.length!==1?'s':''}`;
   document.getElementById('detail-total').textContent = fmtE(total);
@@ -2327,7 +2435,7 @@ function openDetail(catId, month, year) {
           : `<span style="color:var(--muted);font-size:11px">—</span>`;
         return `<tr class="${e.pending?'is-pending':''}">
           <td style="white-space:nowrap">${dayLabel}</td>
-          <td class="amount-cell" style="color:${isIncome?'var(--income)':''}">${isIncome?'+':''}${fmtE(Math.abs(e.amount))}</td>
+          <td class="amount-cell">${amountHtml(e)}</td>
           <td style="color:var(--muted);font-size:12px">${esc(e.notes)||'—'}${e.pending?' <span class="pending-badge">no compta</span>':''}</td>
           <td><div class="action-cell">
             <button class="btn ghost sm" onclick="closeModal('detailModal');editExpense(${Number(e.id)})">Edita</button>
@@ -2480,7 +2588,7 @@ function renderAnalysis() {
     { label:'Nòmina', vA:tA.nomina, vB:tB.nomina, inverse:false, color:'var(--income)' },
     { label:'Despeses', vA:tA.exp, vB:tB.exp, inverse:true, color:'var(--danger)' },
     { label:'Fixes', vA:tA.fixed, vB:tB.fixed, inverse:true, color:'var(--accent2)' },
-    { label:'Variable', vA:tA.variable, vB:tB.variable, inverse:true, color:'#f5a060' },
+    { label:'Variable', vA:tA.variable, vB:tB.variable, inverse:true, color:'var(--orange)' },
     { label:'Estalvi', vA:tA.estalvi, vB:tB.estalvi, inverse:false, color:'var(--accent)' },
   ];
   document.getElementById('analysis-summary').style.gridTemplateColumns = '';
@@ -2498,7 +2606,7 @@ function renderAnalysis() {
   const catTotYear = (yr, cid) => {
     let t = 0;
     for (let m=0; m<12; m++)
-      t += getMonthData(yr,m).filter(e=>e.cat===cid && !e.pending).reduce((s,e)=>s+Math.abs(e.amount),0);
+      t += getMonthData(yr,m).filter(e=>e.cat===cid && !e.pending).reduce((s,e)=>s+val(e),0);
     return t;
   };
 
@@ -2552,25 +2660,14 @@ function renderAnalysis() {
 // ============================================================
 // HISTORIC TAB
 // ============================================================
-// Static historic salary data from Excel (2017-2025)
-const HIST_SEED = {
-  2017:{5:2417,6:2347,7:2378,8:2359,9:2347,10:1975,11:2101},
-  2018:{0:2313,1:2367,2:2179,3:2517,4:2365,5:2617,6:2426,7:2551,8:2561,9:2757,10:2243,11:2190},
-  2019:{0:2496,1:2482,2:4137,3:2630,4:2371,5:2577,6:2546,7:2586,8:2456,9:2733,10:2121,11:2198},
-  2020:{0:2681,1:2543,2:4203,3:2798,4:2398,5:2550,6:2695,7:3719,8:2997,9:2908,10:2549,11:2333},
-  2021:{0:2786,1:3053,2:5427,3:2897,4:3029,5:3095,6:3129,7:2977,8:2957,9:2999,10:2684,11:2582},
-  2022:{0:3660,1:3124,2:5729,3:3362,4:3112,5:3454,6:3039,7:3069,8:3296,9:3071,10:2694,11:2877},
-  2023:{0:3752,1:3378,2:4654,3:3227,4:3167.95,5:3358.32,6:3054,7:3540,8:3463,9:3353.38,10:2966,11:3350.29},
-  2024:{0:3984,1:3481,2:7104,3:3558,4:3524,5:3326,6:3568,7:3685,8:3486,9:3811,10:3095,11:3230},
-  2025:{0:4241.22,1:3616,2:7683,3:4072,4:3883,5:3991,6:4148,7:3751,8:3839,9:4199,10:2993,11:3820},
-};
+// Historic salary data now lives in the user settings (key "hist_seed"), not in the public code.
 
 function getHistoricData() {
   // Load user edits from localStorage
   const edits = sbSettingGet('hist_edits') || {};
   const nomData = {};
-  // Seed data
-  Object.entries(HIST_SEED).forEach(([yr, months]) => {
+  // Seed data (private, stored in the user's settings)
+  Object.entries(sbSettingGet('hist_seed') || {}).forEach(([yr, months]) => {
     nomData[parseInt(yr)] = {...months};
   });
   // App data overrides seed for 2021+
@@ -2578,16 +2675,16 @@ function getHistoricData() {
     for (let mo = 0; mo < 12; mo++) {
       const nom = getMonthData(yr, mo)
         .filter(e => getCat(e.cat).type === 'ingressos' && !e.pending)
-        .reduce((s, e) => s + Math.abs(e.amount), 0);
+        .reduce((s, e) => s + val(e), 0);
       if (nom > 0) { if (!nomData[yr]) nomData[yr] = {}; nomData[yr][mo] = nom; }
     }
   });
   // Apply user manual edits (override everything)
-  Object.entries(edits).forEach(([key, val]) => {
+  Object.entries(edits).forEach(([key, v]) => {
     const [yr, mo] = key.split('-').map(Number);
     if (!nomData[yr]) nomData[yr] = {};
-    if (val === null || val === '') delete nomData[yr][mo];
-    else nomData[yr][mo] = parseFloat(val);
+    if (v === null || v === '') delete nomData[yr][mo];
+    else nomData[yr][mo] = parseFloat(v);
   });
   return nomData;
 }
@@ -2602,12 +2699,19 @@ async function histCellEdit(yr, mo, val) {
   renderHistoric();
 }
 
+async function dismissHistSeedNotice() {
+  await sbSettingSet('hist_seed', sbSettingGet('hist_seed') || {});
+  renderHistoric();
+}
+
 function renderHistoric() {
+  const notice = document.getElementById('histSeedNotice');
+  if (notice) notice.style.display = sbSettingGet('hist_seed') ? 'none' : '';
   const MONTHS_SHORT = ['Gen','Feb','Mar','Abr','Mai','Jun','Jul','Ago','Set','Oct','Nov','Des'];
   const nomData = getHistoricData();
   const curYear = new Date().getFullYear();
   const curMonth = new Date().getMonth(); // 0-based
-  const allYears = [...new Set([...Object.keys(HIST_SEED).map(Number), ...getAvailableYears(), curYear])].sort((a,b)=>a-b);
+  const allYears = [...new Set([...Object.keys(sbSettingGet('hist_seed') || {}).map(Number), ...getAvailableYears(), curYear])].sort((a,b)=>a-b);
   if (new Date().getMonth() === 0) allYears.push(curYear + 1);
   const YEARS = [...new Set(allYears)].sort((a,b)=>a-b);
 
@@ -2631,7 +2735,7 @@ function renderHistoric() {
       const key = `${yr}-${mi}`;
       const val = (nomData[yr]||{})[mi];
       const isPreview = previews[key];
-      const bg = isPreview ? '#fef9c3' : '';
+      const bg = isPreview ? 'var(--warn-bg)' : '';
       html += `<td style="padding:0;border:1px solid var(--border);${bg?'background:'+bg+';':''}" title="Doble clic per marcar/desmarcar com a previsió">
         <input type="number"
           style="width:100px;padding:4px 6px;border:none;background:transparent;font-family:'DM Mono',monospace;font-size:12px;text-align:right;color:var(--text);-moz-appearance:textfield;display:block"
@@ -2646,7 +2750,7 @@ function renderHistoric() {
   });
 
   // Mitjana
-  html += `<tr style="background:rgba(0,0,0,0.02)"><td style="${tdL}">Mitjana</td>`;
+  html += `<tr style="background:var(--row-alt)"><td style="${tdL}">Mitjana</td>`;
   YEARS.forEach(yr => {
     const vals = Object.values(nomData[yr]||{}).filter(v=>v>0);
     const avg = vals.length ? vals.reduce((s,v)=>s+v,0)/vals.length : 0;
@@ -2655,7 +2759,7 @@ function renderHistoric() {
   html += '</tr>';
 
   // Total brut (editable)
-  html += `<tr style="background:rgba(0,0,0,0.02)"><td style="${tdL}">Total brut</td>`;
+  html += `<tr style="background:var(--row-alt)"><td style="${tdL}">Total brut</td>`;
   YEARS.forEach(yr => {
     const val = brutVals[yr] || '';
     html += `<td style="${tdS(false,'var(--muted)')}">
@@ -2726,15 +2830,14 @@ async function histBrutEdit(yr, val) {
 }
 
 const HC_FIELDS = ['hc-vendes','hc-base','hc-basefija','hc-inc','hc-extras','hc-compct','hc-volobj','hc-volabs','hc-plusobj','hc-comu','hc-form','hc-desemp','hc-irpf','hc-mei','hc-solid'];
-const HC_DEFAULTS = {'hc-base':4909.5,'hc-basefija':1850.54,'hc-inc':166.67,'hc-extras':565.35,'hc-compct':0.25,'hc-volobj':1181632,'hc-volabs':323.48,'hc-comu':4.7,'hc-form':0.1,'hc-desemp':1.55,'hc-irpf':31.91,'hc-mei':0.13,'hc-solid':1.76};
+// Salary calculator values are personal: they are only stored in the user's settings (no defaults in the public code).
 
 function loadSalaryFields() {
   const saved = sbSettingGet('salary_calc') || {};
   HC_FIELDS.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
-    if (saved[id] !== undefined) el.value = saved[id];
-    else if (HC_DEFAULTS[id] !== undefined) el.value = HC_DEFAULTS[id];
+    el.value = saved[id] !== undefined ? saved[id] : '';
   });
 }
 
@@ -2805,6 +2908,7 @@ function showTab(tab) {
   else if(tab==='merchants') renderMerchants();
   else if(tab==='analisi') { initAnalysisSelectors(true); renderAnalysis(); }
   else if(tab==='historic') renderHistoric();
+  else if(tab==='cercar') { initSearchFilters(); renderSearch(); setTimeout(() => document.getElementById('s-text')?.focus(), 50); }
 }
 
 function selectMonth(m) {
@@ -2822,6 +2926,7 @@ function onYearChange() {
 
 // Expense modal
 function openAddModal() {
+  if (!canWrite()) return;
   state.editingId = null;
   document.getElementById('modalTitle').textContent = 'Afegir despesa';
   populateExpenseForm();
@@ -2859,6 +2964,12 @@ function populateExpenseForm(exp) {
   document.getElementById('f-notes').value = exp ? (exp.notes||'') : '';
   document.getElementById('f-day').value = exp ? (exp.day || '') : '';
   document.getElementById('f-pending').checked = exp ? !!exp.pending : false;
+  const refundEl = document.getElementById('f-refund');
+  refundEl.checked = exp ? !!exp.refund : false;
+  refundEl.disabled = !hasRefundCol;
+  document.getElementById('f-refund-hint').textContent = hasRefundCol
+    ? "Resta del total de la categoria (p. ex. un retorn d'una compra)"
+    : 'Cal executar supabase/migracio.sql per activar les devolucions';
   const mSel = document.getElementById('f-month');
   mSel.innerHTML = MONTHS.map((m,i)=>`<option value="${i}" ${i===state.month?'selected':''}>${m}</option>`).join('');
   if(exp) mSel.value = exp.month;
@@ -2888,6 +2999,8 @@ function setSign(s) {
     '<option value="__new__" style="color:var(--accent);font-weight:600">+ Nova categoria...</option>';
   if ([...catSel.options].find(o => o.value === prev && o.value !== '__new__')) catSel.value = prev;
   else if (s === 1) { const inc = categories.find(c=>c.type==='ingressos'); if(inc) catSel.value = inc.id; }
+  document.getElementById('f-refund-row').style.display = s === 1 ? 'none' : '';
+  if (s === 1) document.getElementById('f-refund').checked = false;
 }
 
 let _savingExpense = false;
@@ -2904,7 +3017,8 @@ async function saveExpense() {
   if (isNaN(amount) || amount<=0) { showToast('Posa un import vàlid','error'); return; }
   if (day !== null && (isNaN(day) || day < 1 || day > 31)) { showToast('El dia ha de ser entre 1 i 31','error'); return; }
   const pending = document.getElementById('f-pending').checked;
-  const rec = { year, month, day, cat, amount: Math.abs(amount), notes, pending }; // stored positive; category type decides income vs expense
+  const refund = hasRefundCol && document.getElementById('f-refund').checked;
+  const rec = { year, month, day, cat, amount: Math.abs(amount), notes, pending, refund }; // stored positive; category type decides income vs expense
 
   // Duplicate check (skip when editing)
   const editingId = state.editingId;
@@ -3145,6 +3259,7 @@ function validateFmt() {
 }
 
 async function saveFormat() {
+  if (!canWrite()) return;
   const name = document.getElementById('fmt-name').value.trim();
   if (!name) { showToast('Cal un nom pel format', 'error'); return; }
   const types = _fmtSampleLines.map(l => l.type);
@@ -3196,6 +3311,7 @@ function openFormatManager() {
 }
 
 async function deleteFormat(id) {
+  if (!canWrite()) return;
   if (!confirm('Eliminar aquest format?')) return;
   const fmts = getBankFormats().filter(f => f.id !== id && !f.builtin);
   saveBankFormats(fmts);
@@ -3242,19 +3358,13 @@ function parseWithCustomFormat(text, fmt) {
 }
 
 let importedRows = [];
-let importMonth = 0;
+let importMonth = 0;   // reference month (used for lines without a usable date)
 let importYear = new Date().getFullYear();
 
 function openImportModal() {
-  console.log('openImportModal called');
   document.getElementById('dataMenu').style.display = 'none';
-  try {
-    refreshFormatSelector();
-  } catch(e) {
-    console.error('refreshFormatSelector error:', e);
-    alert('Error: ' + e.message);
-    return;
-  }
+  if (!canWrite()) return;
+  refreshFormatSelector();
   const mSel = document.getElementById('import-month');
   const ySel = document.getElementById('import-year');
   mSel.innerHTML = MONTHS.map((m,i) => `<option value="${i}" ${i===state.month?'selected':''}>${m}</option>`).join('');
@@ -3267,88 +3377,67 @@ function openImportModal() {
   document.getElementById('importModal').classList.add('open');
 }
 
+// ── Dates ────────────────────────────────────────────────────────────────────
+const MONTH_NAMES = {
+  gen:0, gener:0, ene:0, enero:0, jan:0, feb:1, febrer:1, febrero:1, mar:2, 'març':2, marc:2, marzo:2,
+  abr:3, abril:3, apr:3, mai:4, maig:4, may:4, mayo:4, jun:5, juny:5, junio:5, jul:6, juliol:6, julio:6,
+  ago:7, agost:7, agosto:7, aug:7, set:8, setembre:8, sep:8, sept:8, septiembre:8, setiembre:8,
+  oct:9, octubre:9, nov:10, novembre:10, noviembre:10, des:11, desembre:11, dic:11, diciembre:11, dec:11
+};
+const normText = s => String(s || '').replace(/[ ​  ﻿]/g,' ').trim();
+
+// "5 de novembre", "5 d'octubre", "05/11", "05/11/2026", "5-11-26", "2026-11-05" -> {day, month(0-11)|null, year|null}
+function parseDateParts(s) {
+  const n = normText(s);
+  let m = n.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return validDate(+m[3], +m[2] - 1, +m[1]);
+  m = n.match(/^(\d{1,2})[\/.\-](\d{1,2})(?:[\/.\-](\d{2,4}))?(?!\d)/);
+  if (m) { let y = m[3] ? +m[3] : null; if (y !== null && y < 100) y += 2000; return validDate(+m[1], +m[2] - 1, y); }
+  m = n.match(/^(\d{1,2})\s+(?:de\s+|d['’]\s*)?([\p{L}·]+)\.?(?:,?\s+(?:de\s+)?(\d{4}))?/iu);
+  if (m) {
+    const key = m[2].toLowerCase();
+    const mo = MONTH_NAMES[key] ?? MONTH_NAMES[key.slice(0, 3)];
+    if (mo === undefined) return null;
+    return validDate(+m[1], mo, m[3] ? +m[3] : null);
+  }
+  return null;
+}
+function validDate(day, month, year) {
+  if (!(day >= 1 && day <= 31)) return null;
+  return { day, month: (month >= 0 && month <= 11) ? month : null, year: (year > 1900 && year < 3000) ? year : null };
+}
+// Month/year of a line: its own date if it has one; the year is guessed as the one closest to the reference month
+function inferYearMonth(parts, refY, refM) {
+  if (!parts || parts.month === null) return { year: refY, month: refM };
+  if (parts.year) return { year: parts.year, month: parts.month };
+  let best = null;
+  for (const y of [refY - 1, refY, refY + 1]) {
+    const d = Math.abs((y * 12 + parts.month) - (refY * 12 + refM));
+    if (!best || d < best.d) best = { d, year: y };
+  }
+  return { year: best.year, month: parts.month };
+}
+
 function isDateLine(s) {
-  const n = s.replace(/[\u00A0\u200B\u2009\u202F\uFEFF]/g,' ').trim();
-  return /^\d{1,2}\s+de\s+\w+/i.test(n) ||
-         /^\d{2}\/\d{2}(\/\d{2,4})?$/.test(n) ||
+  const n = normText(s);
+  return /^\d{1,2}\s+(de\s+|d['’]\s*)[\p{L}·]+/iu.test(n) ||
+         /^\d{1,2}[\/.\-]\d{1,2}([\/.\-]\d{2,4})?$/.test(n) ||
          /^\d{4}-\d{2}-\d{2}$/.test(n);
 }
 function isAmountLine(s) {
-  // Normalize: remove invisible chars, non-breaking spaces, etc.
-  const n = s.replace(/[\u00A0\u200B\u2009\u202F\uFEFF]/g,' ').trim();
+  const n = normText(s);
   return /^-?[\d.,]+\s*[€E]/.test(n) || /^-?[\d.,]+\s*EUR/i.test(n);
 }
-function parseDay(s) {
-  const m = s.match(/^(\d{1,2})\s+de/i) || s.match(/^(\d{2})\//);
-  return m ? parseInt(m[1]) : null;
-}
+function parseDay(s) { return parseDateParts(s)?.day ?? null; }
 function parseAmount(s) {
-  const n = s.replace(/[\u00A0\u200B\u2009\u202F\uFEFF]/g,' ').trim();
+  const n = normText(s);
   const m = n.match(/(-?[\d.,]+)\s*[€E]/);
   if (!m) return null;
   return parseFloat(m[1].replace(/\./g,'').replace(',','.'));
 }
 
-function parseExtract(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-  const rows = [];
-  let i = 0;
-
-  // Detect format: scan first 10 lines to see if date/merchant/amount pattern exists
-  // Format B: date line followed by non-date, non-amount merchant line
-  // Skip header lines (card numbers, etc.) at the start
-  let firstDateIdx = -1;
-  for (let j = 0; j < Math.min(lines.length, 5); j++) {
-    if (isDateLine(lines[j]) && !isDateLine(lines[j+1] || '') && isAmountLine(lines[j+2] || '')) {
-      firstDateIdx = j;
-      break;
-    }
-  }
-  const formatB = firstDateIdx >= 0;
-  i = formatB ? firstDateIdx : 0;
-
-  while (i < lines.length) {
-    if (formatB) {
-      // Format B: DATE / MERCHANT / AMOUNT [/ BALANCE(skip)]
-      if (!isDateLine(lines[i])) { i++; continue; }
-      const dateLine = lines[i];
-      const merchantLine = lines[i+1] || '';
-      const amtLine = lines[i+2] || '';
-      if (!isAmountLine(amtLine)) { i++; continue; }
-      const amt = parseAmount(amtLine);
-      if (amt !== null && amt !== 0) {
-        rows.push({
-          merchant: merchantLine.toUpperCase().trim(),
-          amount: amt,
-          date: dateLine,
-          day: parseDay(dateLine),
-          isPositive: amt > 0
-        });
-      }
-      // Skip balance line if present
-      const nextLine = lines[i+3] || '';
-      i += isAmountLine(nextLine) ? 4 : 3;
-    } else {
-      // Format A: MERCHANT / DATE / AMOUNT
-      const nameLine = lines[i];
-      const dateLine = lines[i+1] || '';
-      const amtLine  = lines[i+2] || '';
-      if (!isDateLine(dateLine) || !isAmountLine(amtLine)) { i++; continue; }
-      const amt = parseAmount(amtLine);
-      if (amt !== null && amt !== 0) {
-        rows.push({
-          merchant: nameLine.toUpperCase().trim(),
-          amount: amt,
-          date: dateLine,
-          day: parseDay(dateLine),
-          isPositive: amt > 0
-        });
-      }
-      i += 3;
-    }
-  }
-  return rows;
-}
+const ymKey = (y, m) => `${y}-${m}`;
+const ymLabel = (y, m) => `${MONTHS[m]} ${y}`;
 
 function analyzeImport() {
   const text = document.getElementById('importText').value.trim();
@@ -3356,6 +3445,7 @@ function analyzeImport() {
 
   importMonth = parseInt(document.getElementById('import-month').value);
   importYear  = parseInt(document.getElementById('import-year').value);
+  const useDates = document.getElementById('import-use-dates').checked;
 
   const fmtId = document.getElementById('import-format')?.value;
   let rows = [], detectedFmt = null;
@@ -3369,7 +3459,6 @@ function analyzeImport() {
       if (r.length > bestCount) { bestCount = r.length; rows = r; detectedFmt = f; }
     }
     if (!rows.length) { showToast("No s'ha pogut detectar el format automàticament.", "error"); return; }
-    // Update selector to show detected format
     document.getElementById('import-format').value = detectedFmt.id;
     showToast('Format detectat: ' + detectedFmt.name);
   } else {
@@ -3381,18 +3470,22 @@ function analyzeImport() {
 
   // Assign category: known merchant -> its cat, else default variable cat
   const defaultCat = categories.find(c => c.id === 'altres')?.id || categories.find(c => c.type === 'variable')?.id || '';
-  const nominaCat = categories.find(c=>c.id==='nomina')?.id || 'nomina';
+  const incomeCat = categories.find(c => c.id === 'nomina')?.id || categories.find(c => c.type === 'ingressos')?.id || 'nomina';
   importedRows = rows.map(r => {
     const known = merchants[r.merchant];
     const isSkip = known && known.cat === '__skip__';
     let cat;
-    if (r.isPositive) cat = known && !isSkip ? known.cat : nominaCat;
+    if (r.isPositive) cat = known && !isSkip ? known.cat : incomeCat;
     else cat = known && !isSkip ? known.cat : defaultCat;
+    const parts = r.date ? parseDateParts(r.date) : null;
+    const ym = useDates ? inferYearMonth(parts, importYear, importMonth) : { year: importYear, month: importMonth };
     return {
       merchant:   r.merchant,
       amount:     r.amount,
       date:       r.date,
-      day:        r.day || null,
+      day:        parts?.day || r.day || null,
+      year:       ym.year,
+      month:      ym.month,
       cat,
       notes:      '',
       isPositive: r.isPositive,
@@ -3413,7 +3506,26 @@ function toggleSkipRow(i, skip) {
   importedRows[i]._skipOverride = skip;
 }
 
+// Money coming in, assigned to an expense category = a refund (subtracts from that category)
+function isRefundRow(r, cat) { return hasRefundCol && r.isPositive && getCat(cat).type !== 'ingressos'; }
+function updateRefundHint(i) {
+  const el = document.getElementById('rv-refund-' + i);
+  const cat = document.getElementById('rv-cat-' + i)?.value;
+  if (el) el.style.display = isRefundRow(importedRows[i], cat) ? '' : 'none';
+}
+
 function openReviewModal() {
+  // Months involved (each line goes to the month of its own date)
+  const yms = new Map();
+  const addYm = (y, m) => { const d = new Date(y, m, 1); yms.set(ymKey(d.getFullYear(), d.getMonth()), [d.getFullYear(), d.getMonth()]); };
+  importedRows.forEach(r => addYm(r.year, r.month));
+  addYm(importYear, importMonth - 1); addYm(importYear, importMonth); addYm(importYear, importMonth + 1);
+  const ymList = [...yms.values()].sort((a, b) => (a[0]*12 + a[1]) - (b[0]*12 + b[1]));
+  const months = new Set(importedRows.map(r => ymKey(r.year, r.month)));
+  document.getElementById('reviewMonthsInfo').textContent = months.size > 1
+    ? `L'extracte inclou ${months.size} mesos: cada moviment s'assignarà al mes de la seva data (es pot canviar a cada línia).`
+    : `Tots els moviments aniran a ${ymLabel(importedRows[0]?.year ?? importYear, importedRows[0]?.month ?? importMonth)}.`;
+
   document.getElementById('reviewList').innerHTML = importedRows.map((r,i) => {
     const skipChecked = r.wasSkip ? 'checked' : '';
     const itemStyle = r.wasSkip ? 'opacity:0.45' : '';
@@ -3426,7 +3538,8 @@ function openReviewModal() {
             ${r.wasKnown ? '<span class="known-badge">★ conegut</span>' : ''}
             ${r.wasSkip  ? '<span style="color:var(--muted);font-size:10px;font-weight:600;margin-left:6px">⊘ ignorar</span>' : ''}
           </div>
-          <div class="review-meta">${r.day ? esc(r.day + (r.date ? ' ' + r.date.replace(/^\d+\s+/, '') : '')) + ' · ' : ''}${fmtE(Math.abs(r.amount))}</div>
+          <div class="review-meta">${r.date ? esc(r.date) + ' · ' : ''}${fmtE(Math.abs(r.amount))}
+            <span id="rv-refund-${i}" style="color:var(--income);font-weight:600;${isRefundRow(r, r.cat)?'':'display:none'}"> · ↩ devolució</span></div>
         </div>
         <div style="display:flex;align-items:center;gap:6px;white-space:nowrap">
           <div class="review-amount" style="color:${r.isPositive?'var(--income)':'var(--danger)'}">${r.isPositive?'+':'-'}${fmtE(Math.abs(r.amount))}</div>
@@ -3436,14 +3549,17 @@ function openReviewModal() {
           </label>
         </div>
       </div>
-      <div class="review-selects" id="rv-selects-${i}" style="${r.wasSkip?'display:none':''}">
-        <select id="rv-cat-${i}" style="flex:2" onchange="handleCatSelect('rv-cat-${i}')">
+      <div class="review-selects" id="rv-selects-${i}" style="flex-wrap:wrap;${r.wasSkip?'display:none':''}">
+        <select id="rv-cat-${i}" style="flex:2;min-width:140px" onchange="handleCatSelect('rv-cat-${i}');updateRefundHint(${i})">
           ${categories.filter(c => r.isPositive ? true : c.type!=='ingressos').map(c =>
             `<option value="${esc(c.id)}" ${c.id===r.cat?'selected':''}>${esc(c.name)}</option>`
           ).join('')}
           <option value="__new__" style="color:var(--accent);font-weight:600">+ Nova categoria...</option>
         </select>
-        <input type="text" id="rv-notes-${i}" value="${esc(r.notes || r.merchant)}" placeholder="Notes..." style="flex:3">
+        <select id="rv-ym-${i}" style="flex:1;min-width:120px" title="Mes on es guardarà">
+          ${ymList.map(([y, m]) => `<option value="${ymKey(y, m)}" ${y===r.year && m===r.month?'selected':''}>${ymLabel(y, m)}</option>`).join('')}
+        </select>
+        <input type="text" id="rv-notes-${i}" value="${esc(r.notes || r.merchant)}" placeholder="Notes..." style="flex:3;min-width:140px">
       </div>
     </div>`;
   }).join('');
@@ -3464,6 +3580,7 @@ function openReviewModal() {
 let _importing = false;
 async function confirmImport() {
   if (_importing) return; // avoid double click => double import
+  if (!canWrite()) return;
   const confirmBtn = document.getElementById('confirmImportBtn');
   _importing = true;
   confirmBtn.disabled = true;
@@ -3478,7 +3595,7 @@ async function confirmImport() {
 }
 
 async function doConfirmImport() {
-  const rowStatus = []; // 'imported' | 'skipped_manual' | 'dup'
+  const rowStatus = []; // 'imported' | 'skipped_manual' | 'dup' | 'error'
   const toInsert = [];  // { idx, rec }
   const dupIdxs = [];
   const uiValues = {};
@@ -3487,12 +3604,16 @@ async function doConfirmImport() {
   // Duplicates are only checked against what existed BEFORE this import, and each
   // existing entry can only "absorb" one imported line (two identical coffees the same
   // day in the extract are both real).
-  const existingPool = [...getMonthData(importYear, importMonth)];
-  const takeDup = (cat, amount, day) => {
-    const k = existingPool.findIndex(e =>
-      e.cat === cat && Math.abs(Math.abs(e.amount) - Math.abs(amount)) < 0.01 && (day == null || e.day === day));
+  const pools = {};
+  const takeDup = (y, m, cat, amount, day, refund) => {
+    const key = ymKey(y, m);
+    if (!pools[key]) pools[key] = [...getMonthData(y, m)];
+    const pool = pools[key];
+    const k = pool.findIndex(e =>
+      e.cat === cat && Math.abs(Math.abs(e.amount) - Math.abs(amount)) < 0.01 &&
+      (day == null || e.day === day) && !!e.refund === !!refund);
     if (k < 0) return null;
-    return existingPool.splice(k, 1)[0];
+    return pool.splice(k, 1)[0];
   };
 
   for (let i = 0; i < importedRows.length; i++) {
@@ -3501,9 +3622,12 @@ async function doConfirmImport() {
     const doSkip = skipEl ? skipEl.checked : (r._skipOverride || r.wasSkip);
     const catEl   = document.getElementById(`rv-cat-${i}`);
     const notesEl = document.getElementById(`rv-notes-${i}`);
+    const ymEl    = document.getElementById(`rv-ym-${i}`);
     const cat   = catEl ? catEl.value : r.cat;
     const notes = notesEl ? notesEl.value.trim() : r.merchant;
-    uiValues[i] = { cat, notes };
+    const [y, m] = ymEl ? ymEl.value.split('-').map(Number) : [r.year, r.month];
+    const refund = isRefundRow(r, cat);
+    uiValues[i] = { cat, notes, year: y, month: m, refund };
     if (doSkip) {
       merchants[r.merchant] = { cat: '__skip__', count: (merchants[r.merchant]?.count || 0) + 1 };
       touchedMerchants.add(r.merchant);
@@ -3511,10 +3635,10 @@ async function doConfirmImport() {
       continue;
     }
     if (!cat || cat === '__new__') { rowStatus.push('skipped_manual'); continue; }
-    if (takeDup(cat, r.amount, r.day || null)) { rowStatus.push('dup'); dupIdxs.push(i); continue; }
+    if (takeDup(y, m, cat, r.amount, r.day || null, refund)) { rowStatus.push('dup'); dupIdxs.push(i); continue; }
     toInsert.push({ idx: i, rec: {
-      user_id: currentUser.id, year: importYear, month: importMonth, day: r.day || null,
-      cat, amount: Math.abs(r.amount), notes, pending: false
+      user_id: currentUser.id,
+      ...expenseRow({ year: y, month: m, day: r.day || null, cat, amount: r.amount, notes, pending: false, refund })
     }});
     rowStatus.push('imported');
   }
@@ -3565,15 +3689,20 @@ async function doConfirmImport() {
     }
   });
 
+  // Where did the entries go?
+  const perMonth = {};
+  toInsert.forEach(x => { if (rowStatus[x.idx] === 'imported') { const k = ymLabel(x.rec.year, x.rec.month); perMonth[k] = (perMonth[k] || 0) + 1; } });
+  const perMonthTxt = Object.entries(perMonth).map(([k, n]) => `${n} a ${k}`).join(' · ');
+
   let html = `<div style="display:flex;gap:24px;margin-bottom:${skippedRows.length?'12px':'0'}">
     <div><span id="imp-count-saved" style="font-size:22px;font-weight:700;color:var(--income)">${saved}</span><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Importades</div></div>
     ${skipped > 0 ? `<div><span id="imp-count-skipped" style="font-size:22px;font-weight:700;color:var(--danger)">${skipped}</span><div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ignorades</div></div>` : ''}
-  </div>`;
+  </div>${perMonthTxt ? `<div style="font-size:12px;color:var(--muted);margin-bottom:8px">${esc(perMonthTxt)}</div>` : ''}`;
 
   window._skippedRows = dupIdxs.map((origIdx, i) => {
     const r = importedRows[origIdx];
     const ui = uiValues[origIdx] || {};
-    return { ...r, cat: ui.cat || r.cat, _notes: ui.notes || r.merchant, _idx: i, _forceImport: false };
+    return { ...r, cat: ui.cat || r.cat, year: ui.year ?? r.year, month: ui.month ?? r.month, _notes: ui.notes || r.merchant, _idx: i, _forceImport: false };
   });
 
   if (skippedRows.length) {
@@ -3607,14 +3736,14 @@ function openDupDetail(idx) {
   document.getElementById('dupDetail-title').textContent = r.merchant;
 
   // Find existing duplicate for comparison
-  const existingInMonth = (getMonthData(importYear, importMonth)||[]).find(e =>
+  const existingInMonth = getMonthData(r.year, r.month).find(e =>
     Math.abs(Math.abs(e.amount) - Math.abs(r.amount)) < 0.01 && (r.day == null || e.day === r.day)
   );
 
   const existingHtml = existingInMonth
     ? `<div style="padding:10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:8px">
         <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Ja existent</div>
-        <div style="font-family:'DM Mono',monospace;font-weight:600">${fmtE(Math.abs(existingInMonth.amount))}</div>
+        <div style="font-family:'DM Mono',monospace;font-weight:600">${amountHtml(existingInMonth)}</div>
         <div style="font-size:12px;color:var(--muted)">${existingInMonth.day ? 'Dia '+existingInMonth.day+' · ':''} ${esc(getCat(existingInMonth.cat).name)}${existingInMonth.notes ? ' · '+esc(existingInMonth.notes) : ''}</div>
       </div>`
     : '';
@@ -3622,7 +3751,7 @@ function openDupDetail(idx) {
   document.getElementById('dupDetail-body').innerHTML = `
     ${existingHtml}
     <div style="padding:10px;border-radius:8px;background:var(--surface);border:1px solid var(--border);margin-bottom:0">
-      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Nova entrada</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px">Nova entrada · ${esc(ymLabel(r.year, r.month))}</div>
       <div style="font-family:'DM Mono',monospace;font-weight:600">${fmtE(Math.abs(r.amount))}</div>
       <div style="font-size:12px;color:var(--muted)">${r.day ? 'Dia '+r.day+' · ':''} ${esc(r.date||'')}</div>
     </div>`;
@@ -3647,7 +3776,6 @@ function closeDupDetail() {
     const r = window._skippedRows[_currentDupIdx];
     r.cat = document.getElementById('dup-cat').value;
     r._notes = document.getElementById('dup-notes').value;
-    // Update row status to show it's been reviewed (if not imported)
     if (!r._forceImport) {
       const statusEl = document.getElementById(`dup-status-${_currentDupIdx}`);
       if (statusEl) { statusEl.textContent = 'Revisada — clicar per tornar'; statusEl.style.color = 'var(--accent2)'; }
@@ -3665,16 +3793,14 @@ async function importDupRow() {
   if (idx === null) return;
   const r = window._skippedRows[idx];
   if (r._forceImport) { showToast('Aquesta ja està importada'); return; }
-  // Use cat and notes from the detail form
   const cat   = document.getElementById('dup-cat').value;
   if (!cat || cat === '__new__') { showToast('Selecciona una categoria', 'error'); return; }
   const notes = document.getElementById('dup-notes').value.trim() || r.merchant;
-  // Save back to state
   r.cat    = cat;
   r._notes = notes;
   r._forceImport = true;
 
-  const newId = await addExpense({ year: importYear, month: importMonth, day: r.day||null, cat, amount: Math.abs(r.amount), notes });
+  const newId = await addExpense({ year: r.year, month: r.month, day: r.day||null, cat, amount: Math.abs(r.amount), notes, refund: isRefundRow(r, cat) });
   if (!newId) { r._forceImport = false; showToast('Error en guardar', 'error'); return; }
   const existing = merchants[r.merchant];
   await putMerchant({ name: r.merchant, cat, count: (existing?.count || 0) + 1 });
@@ -3761,8 +3887,199 @@ async function deleteMerchant(name) {
 }
 
 // ============================================================
-// RESET
+// SEARCH (all entries, all years)
+// ============================================================
+function initSearchFilters() {
+  const ySel = document.getElementById('s-year'), cSel = document.getElementById('s-cat');
+  if (!ySel || !cSel) return;
+  const py = ySel.value, pc = cSel.value;
+  ySel.innerHTML = '<option value="">Tots els anys</option>' + getAvailableYears().slice().reverse().map(y => `<option value="${y}">${y}</option>`).join('');
+  const used = new Set(allExpenses().map(e => e.cat));
+  const cats = [...categories.filter(c => used.has(c.id)), ...[...used].filter(id => !categories.find(c => c.id === id)).map(id => getCat(id))];
+  cSel.innerHTML = '<option value="">Totes les categories</option>' + cats.map(c => `<option value="${esc(c.id ?? c.name)}">${esc(c.name)}</option>`).join('');
+  if ([...ySel.options].some(o => o.value === py)) ySel.value = py;
+  if ([...cSel.options].some(o => o.value === pc)) cSel.value = pc;
+}
 
+function searchResults() {
+  const q = (document.getElementById('s-text')?.value || '').trim().toLowerCase();
+  const yr = document.getElementById('s-year')?.value;
+  const cat = document.getElementById('s-cat')?.value;
+  const type = document.getElementById('s-type')?.value;
+  const qNum = q.replace(/\s|€/g, '').replace(/\./g, '').replace(',', '.');
+  return allExpenses().filter(e => {
+    if (yr && String(e.year) !== yr) return false;
+    if (cat && e.cat !== cat) return false;
+    const ct = getCat(e.cat).type;
+    if (type === 'refund' ? !e.refund : type === 'pending' ? !e.pending : (type && ct !== type)) return false;
+    if (!q) return true;
+    if ((e.notes || '').toLowerCase().includes(q) || getCat(e.cat).name.toLowerCase().includes(q)) return true;
+    if (qNum && !isNaN(parseFloat(qNum))) {
+      const amt = Math.abs(e.amount).toFixed(2);
+      return amt.startsWith(qNum) || amt === parseFloat(qNum).toFixed(2);
+    }
+    return false;
+  }).sort((a, b) => (b.year - a.year) || (b.month - a.month) || ((b.day || 0) - (a.day || 0)));
+}
+
+function renderSearch() {
+  const tbody = document.getElementById('s-results');
+  if (!tbody) return;
+  const res = searchResults();
+  const counted = res.filter(e => !e.pending);
+  const exp = counted.filter(e => getCat(e.cat).type !== 'ingressos').reduce((s, e) => s + val(e), 0);
+  const inc = counted.filter(e => getCat(e.cat).type === 'ingressos').reduce((s, e) => s + val(e), 0);
+  const LIMIT = 300;
+  document.getElementById('s-summary').innerHTML =
+    `<b>${res.length}</b> apunt${res.length !== 1 ? 's' : ''} · Despeses: <b style="color:var(--danger)">${fmtE(exp)}</b>` +
+    (inc ? ` · Ingressos: <b style="color:var(--income)">${fmtE(inc)}</b>` : '') +
+    (res.length > LIMIT ? ` · es mostren els ${LIMIT} més recents` : '');
+  if (!res.length) { tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">Cap resultat</div></td></tr>`; return; }
+  tbody.innerHTML = res.slice(0, LIMIT).map(e => `
+    <tr class="${e.pending ? 'is-pending' : ''}">
+      <td style="font-family:'DM Mono',monospace;font-size:12px;white-space:nowrap;color:var(--muted)">${e.day ? String(e.day).padStart(2,'0') + '/' : ''}${String(e.month + 1).padStart(2,'0')}/${e.year}</td>
+      <td><span class="cat-badge cat-badge-link" onclick="openDetail('${jsq(e.cat)}',${e.month},${e.year})">${esc(getCat(e.cat).name)}</span>${e.pending ? '<span class="pending-badge">no compta</span>' : ''}</td>
+      <td class="amount-cell" style="white-space:nowrap">${amountHtml(e)}</td>
+      <td class="notes-cell" title="${esc(e.notes)}">${esc(e.notes) || '—'}</td>
+      <td><div class="action-cell">
+        <button class="btn ghost sm" onclick="editExpense(${Number(e.id)})">Edita</button>
+        <button class="btn danger sm" onclick="deleteExpenseFromTable(${Number(e.id)})">Del</button>
+      </div></td>
+    </tr>`).join('');
+}
+
+// ============================================================
+// CSV EXPORT (opens in Excel: ";" separator, decimal comma, UTF-8 BOM)
+// ============================================================
+function csvCell(v, isText) {
+  let s = String(v ?? '');
+  // Avoid formula injection in spreadsheets (text coming from bank extracts)
+  if (isText && /^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[";\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function expensesToCsv(list) {
+  const TYPE = { fixa: 'Fixa', variable: 'Variable', ingressos: 'Ingrés' };
+  const rows = [['Data','Any','Mes','Dia','Categoria','Tipus','Import','Devolució','No compta','Notes']];
+  [...list].sort((a, b) => (a.year - b.year) || (a.month - b.month) || ((a.day || 0) - (b.day || 0))).forEach(e => {
+    const c = getCat(e.cat);
+    const date = `${e.year}-${String(e.month + 1).padStart(2,'0')}` + (e.day ? '-' + String(e.day).padStart(2,'0') : '');
+    rows.push([date, e.year, MONTHS[e.month], e.day || '', csvCell(c.name, true), TYPE[c.type] || c.type,
+      val(e).toFixed(2).replace('.', ','), e.refund ? 'Sí' : '', e.pending ? 'Sí' : '', csvCell(e.notes, true)]);
+  });
+  return '﻿' + rows.map(r => r.join(';')).join('\r\n');
+}
+function downloadText(text, filename, mime) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+function exportCsvAll() {
+  document.getElementById('dataMenu').style.display = 'none';
+  const list = allExpenses();
+  if (!list.length) { showToast('No hi ha apunts per exportar', 'error'); return; }
+  downloadText(expensesToCsv(list), 'despeses-' + new Date().toISOString().slice(0,10) + '.csv', 'text/csv;charset=utf-8');
+  showToast(`${list.length} apunts exportats a CSV`);
+}
+function exportSearchCsv() {
+  const list = searchResults();
+  if (!list.length) { showToast('Cap resultat per exportar', 'error'); return; }
+  downloadText(expensesToCsv(list), 'despeses-cerca-' + new Date().toISOString().slice(0,10) + '.csv', 'text/csv;charset=utf-8');
+  showToast(`${list.length} apunts exportats a CSV`);
+}
+
+// ============================================================
+// THEME (automatic / light / dark) — per device
+// ============================================================
+const THEME_LABELS = { auto: 'Automàtic', light: 'Clar', dark: 'Fosc' };
+function getThemePref() { try { return localStorage.getItem('desp_theme') || 'auto'; } catch(e) { return 'auto'; } }
+function cycleTheme() {
+  const order = ['auto', 'light', 'dark'];
+  const next = order[(order.indexOf(getThemePref()) + 1) % order.length];
+  try { localStorage.setItem('desp_theme', next); } catch(e) {}
+  if (next === 'auto') document.documentElement.removeAttribute('data-theme');
+  else document.documentElement.setAttribute('data-theme', next);
+  applyThemeLabel();
+}
+function applyThemeLabel() {
+  const item = document.getElementById('themeMenuItem');
+  if (item) item.textContent = '◐ Tema: ' + THEME_LABELS[getThemePref()];
+  const meta = document.getElementById('meta-theme-color');
+  if (meta) meta.setAttribute('content', getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#ffffff');
+}
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyThemeLabel); } catch(e) {}
+
+// ============================================================
+// OFFLINE (read-only) MODE
+// ============================================================
+// After every successful load the data is kept in a local snapshot so the app can
+// still be opened without connection (read-only). It is deleted on logout.
+const LS_SNAPSHOT = 'desp_offline_snapshot';
+let offlineMode = false;
+
+function saveSnapshot() {
+  if (!currentUser || offlineMode) return;
+  lsSet(LS_SNAPSHOT, {
+    uid: currentUser.id, email: currentUser.email || '', savedAt: new Date().toISOString(),
+    categories, merchants, expenses: allExpenses(), settings: _settingsCache, formats: lsGet(LS_FORMATS) || []
+  });
+}
+let _snapTimer = null;
+function scheduleSnapshot() { clearTimeout(_snapTimer); _snapTimer = setTimeout(saveSnapshot, 1000); }
+
+function loadSnapshot(uid) {
+  const s = lsGet(LS_SNAPSHOT);
+  if (!s || (uid && s.uid !== uid)) return null;
+  categories = s.categories || [...DEFAULT_CATS];
+  merchants = s.merchants || {};
+  expenses = {};
+  (s.expenses || []).forEach(pushExpenseLocal);
+  _settingsCache = s.settings || {};
+  return s;
+}
+
+// Block any write while offline. Returns true when writing is allowed.
+function canWrite() {
+  if (!offlineMode) return true;
+  showToast('Sense connexió: mode només lectura', 'error');
+  return false;
+}
+
+function showOfflineBanner(s) {
+  const diag = document.getElementById('diag');
+  const when = s?.savedAt ? new Date(s.savedAt).toLocaleString('ca-ES', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '?';
+  diag.style.display = 'block';
+  diag.style.background = 'var(--warn-bg)';
+  diag.style.color = 'var(--warn-text)';
+  diag.innerHTML = `⚡ Sense connexió — mode només lectura (dades del ${esc(when)}). <a href="#" onclick="location.reload();return false" style="color:inherit;font-weight:700">Reintentar</a>`;
+}
+
+function enterOfflineMode(s) {
+  offlineMode = true;
+  if (!currentUser) currentUser = { id: s.uid, email: s.email };
+  applyCategoryOrder();
+  state.month = new Date().getMonth();
+  state.year = new Date().getFullYear();
+  updateUserNameBtn();
+  initAnalysisSelectors();
+  showApp();
+  refreshViews();
+  showOfflineBanner(s);
+}
+
+function openOfflineFromLogin() {
+  const s = loadSnapshot();
+  if (s) enterOfflineMode(s);
+}
+
+function updateLoginOfflineOption() {
+  const el = document.getElementById('login-offline');
+  if (!el) return;
+  const s = lsGet(LS_SNAPSHOT);
+  el.style.display = (s && !navigator.onLine) ? '' : 'none';
+}
 
 // ============================================================
 // INIT
@@ -3778,6 +4095,7 @@ function showLogin() {
   document.getElementById('loginScreen').classList.add('visible');
   document.getElementById('diag').style.display = 'none';
   document.querySelectorAll('header').forEach(el => el.style.display = 'none');
+  updateLoginOfflineOption();
 }
 
 async function onAuthChange(session) {
@@ -3785,16 +4103,17 @@ async function onAuthChange(session) {
   const btn = document.getElementById('login-btn');
   if (session?.user) {
     currentUser = session.user;
+    offlineMode = false;
     updateUserNameBtn();
     diag.textContent = 'Carregant dades...';
     diag.style.display = 'block';
-    diag.style.background = '#fef9c3';
-    diag.style.color = '#713f12';
+    diag.style.background = 'var(--warn-bg)';
+    diag.style.color = 'var(--warn-text)';
 
     // Timeout safety — if loadAll hangs for 15s, show error
     const timeout = setTimeout(() => {
-      diag.style.background = '#fee2e2';
-      diag.style.color = '#dc2626';
+      diag.style.background = 'var(--err-bg)';
+      diag.style.color = 'var(--danger)';
       diag.textContent = 'ERROR: Temps esgotat connectant a Supabase. Comprova la connexió a internet.';
       if (btn) { btn.innerHTML = 'Entrar'; btn.disabled = false; }
     }, 15000);
@@ -3802,6 +4121,7 @@ async function onAuthChange(session) {
     try {
       await loadAll();
       await loadUserSettings();
+      await detectRefundColumn();
       applyCategoryOrder();
       clearTimeout(timeout);
       state.month = new Date().getMonth();
@@ -3813,25 +4133,32 @@ async function onAuthChange(session) {
       renderMonthBar();
       initAnalysisSelectors();
       checkBackupReminder();
+      saveSnapshot();
       diag.style.display = 'none';
       showApp();
       if (btn) { btn.innerHTML = 'Entrar'; btn.disabled = false; }
     } catch(err) {
       clearTimeout(timeout);
-      diag.style.background = '#fee2e2';
-      diag.style.color = '#dc2626';
-      diag.textContent = 'ERROR carregant dades: ' + err.message;
       if (btn) { btn.innerHTML = 'Entrar'; btn.disabled = false; }
+      // No connection? Open the last saved copy in read-only mode
+      const snap = loadSnapshot(currentUser.id);
+      if (snap) { enterOfflineMode(snap); return; }
+      diag.style.background = 'var(--err-bg)';
+      diag.style.color = 'var(--danger)';
+      diag.textContent = 'ERROR carregant dades: ' + err.message;
     }
   } else {
     currentUser = null;
     expenses = {}; categories = []; merchants = {};
-    // Don't leave the previous user's cached data on a shared device
-    _settingsCache = {};
-    [...SB_SETTINGS_KEYS, LS_FORMATS].forEach(k => localStorage.removeItem(k));
     showLogin();
     if (btn) { btn.innerHTML = 'Entrar'; btn.disabled = false; }
   }
+}
+
+// Remove everything this user left on the device (called on explicit logout)
+function clearLocalUserData() {
+  _settingsCache = {};
+  [...SB_SETTINGS_KEYS, LS_FORMATS, LS_SNAPSHOT].forEach(k => { try { localStorage.removeItem(k); } catch(e) {} });
 }
 
 // Gentle reminder to download a backup at least once a month
@@ -3849,16 +4176,25 @@ function checkBackupReminder() {
 let _authHandled = false;
 
 async function init() {
-  // Setup PWA manifest
-  const manifest = { name:'Despeses Personals', short_name:'Despeses', start_url:'https://bernatns.github.io/despeses/', display:'standalone', background_color:'#000000', theme_color:'#f5a623', icons:[{src:new URL('icon-192.png', location.href).href,sizes:'192x192',type:'image/png'},{src:new URL('icon-512.png', location.href).href,sizes:'512x512',type:'image/png'}] };
-  const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
-  document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
+  applyThemeLabel();
+
+  // Service worker: lets the installed app open without connection
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    navigator.serviceWorker.register('sw.js').catch(e => console.warn('SW:', e.message));
+  }
+  window.addEventListener('online', () => {
+    updateLoginOfflineOption();
+    if (offlineMode) {
+      const diag = document.getElementById('diag');
+      diag.innerHTML = '✓ Connexió recuperada. <a href="#" onclick="location.reload();return false" style="color:inherit;font-weight:700">Tornar a carregar</a>';
+    }
+  });
+  window.addEventListener('offline', updateLoginOfflineOption);
 
   // Show login initially
   showLogin();
 
-  // Use ONLY onAuthStateChange — it fires immediately with existing session
-  // This avoids double-calling onAuthChange when session exists
+  // Use ONLY onAuthStateChange — it fires immediately with existing session.
   // NB: supabase-js can deadlock if other supabase calls are awaited inside this
   // callback, so the real work is deferred with setTimeout.
   sb.auth.onAuthStateChange((_event, session) => {
